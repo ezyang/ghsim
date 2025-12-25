@@ -1,11 +1,12 @@
 [project]
-name = "YOUR_PROJECT"
+name = "ghsim"
 version = "0.1.0"
-description = "YOUR_DESCRIPTION"
+description = "GitHub notification simulation and testing tool for bulk notification management"
 readme = "README.md"
 requires-python = ">=3.12"
 license = {text = "MIT"}
 dependencies = [
+    "playwright>=1.49.0",
 ]
 
 [build-system]
@@ -13,7 +14,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.pyrefly.errors]
-import-error = "error"
+missing-import = "error"
 
 [tool.pytest.ini_options]
 addopts = "-n auto --tb=native"
@@ -31,7 +32,7 @@ dev-dependencies = [
 
 [tool.pyrefly]
 project-includes = [
-    "YOUR_PROJECT",
+    "ghsim",
     "tests",
 ]
 project-excludes = [

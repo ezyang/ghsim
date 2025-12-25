@@ -10,3 +10,16 @@ __pycache__
 # Claude tends to generate these, don't check them in
 test_*.py
 debug_*.py
+
+# Playwright credential storage (contains sensitive auth state)
+auth_state/
+
+# Playwright artifacts
+playwright-report/
+test-results/
+
+# Saved HTML/JSON responses for offline testing
+responses/
+
+# GitHub API tokens
+*.token
