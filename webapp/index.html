@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>API Debug</title>
+    <style>
+        body { font-family: monospace; max-width: 1000px; margin: 20px auto; padding: 0 20px; }
+        h1 { font-size: 18px; }
+        fieldset { margin-bottom: 15px; }
+        label { display: inline-block; width: 80px; }
+        input[type="text"] { width: 300px; font-family: monospace; }
+        button { padding: 8px 16px; margin-right: 10px; }
+        #url { background: #f0f0f0; padding: 10px; margin: 10px 0; word-break: break-all; }
+        #response { background: #1e1e1e; color: #d4d4d4; padding: 15px; overflow-x: auto; white-space: pre-wrap; min-height: 200px; }
+        .status { padding: 5px 10px; margin-bottom: 10px; }
+        .status.ok { background: #d4edda; }
+        .status.error { background: #f8d7da; }
+        .status.loading { background: #cce5ff; }
+        #auth-status { padding: 10px; margin-bottom: 20px; border: 1px solid #ccc; }
+        #auth-status.ok { border-color: #28a745; background: #d4edda; }
+        #auth-status.error { border-color: #dc3545; background: #f8d7da; }
+        #auth-status.loading { border-color: #007bff; background: #cce5ff; }
+        hr { margin: 30px 0; border: none; border-top: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>API Debug</h1>
+
+    <div id="auth-status" class="loading">Checking authentication...</div>
+
+    <hr>
+
+    <h2>GET /notifications/html/repo/{owner}/{repo}</h2>
+
+    <fieldset>
+        <legend>Path Parameters</legend>
+        <div><label>owner:</label><input type="text" id="owner" value=""></div>
+        <div><label>repo:</label><input type="text" id="repo" value=""></div>
+    </fieldset>
+
+    <fieldset>
+        <legend>Query Parameters</legend>
+        <div><label>before:</label><input type="text" id="before" placeholder="(pagination cursor)"></div>
+        <div><label>after:</label><input type="text" id="after" placeholder="(pagination cursor)"></div>
+        <div><label>fixture:</label><input type="text" id="fixture" placeholder="(path to HTML file)"></div>
+    </fieldset>
+
+    <button onclick="send()">Send Request</button>
+    <button onclick="document.getElementById('response').textContent = ''">Clear</button>
+
+    <div id="url"></div>
+    <div id="status" class="status" style="display:none"></div>
+    <pre id="response"></pre>
+
+    <script>
+        function buildUrl() {
+            const owner = document.getElementById('owner').value.trim();
+            const repo = document.getElementById('repo').value.trim();
+            if (!owner || !repo) return null;
+
+            let url = `/notifications/html/repo/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
+            const params = new URLSearchParams();
+
+            const before = document.getElementById('before').value.trim();
+            const after = document.getElementById('after').value.trim();
+            const fixture = document.getElementById('fixture').value.trim();
+
+            if (before) params.set('before', before);
+            if (after) params.set('after', after);
+            if (fixture) params.set('fixture', fixture);
+
+            if (params.toString()) url += '?' + params.toString();
+            return url;
+        }
+
+        function updateUrl() {
+            const url = buildUrl();
+            document.getElementById('url').textContent = url ? 'GET ' + url : '(enter owner and repo)';
+        }
+
+        async function send() {
+            const url = buildUrl();
+            if (!url) {
+                showStatus('Enter owner and repo', 'error');
+                return;
+            }
+
+            showStatus('Loading...', 'loading');
+            const start = Date.now();
+
+            try {
+                const resp = await fetch(url);
+                const elapsed = Date.now() - start;
+                const data = await resp.json();
+
+                document.getElementById('response').textContent = JSON.stringify(data, null, 2);
+
+                if (resp.ok) {
+                    const count = data.notifications?.length ?? 0;
+                    showStatus(`${resp.status} OK - ${count} notifications - ${elapsed}ms`, 'ok');
+                } else {
+                    showStatus(`${resp.status} ${resp.statusText} - ${elapsed}ms`, 'error');
+                }
+            } catch (e) {
+                showStatus('Error: ' + e.message, 'error');
+                document.getElementById('response').textContent = e.stack || e.message;
+            }
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            el.className = 'status ' + type;
+            el.style.display = 'block';
+        }
+
+        // Persist field values in localStorage
+        const fields = ['owner', 'repo', 'before', 'after', 'fixture'];
+
+        function saveFields() {
+            fields.forEach(id => {
+                localStorage.setItem('debug_' + id, document.getElementById(id).value);
+            });
+        }
+
+        function loadFields() {
+            fields.forEach(id => {
+                const saved = localStorage.getItem('debug_' + id);
+                if (saved) document.getElementById(id).value = saved;
+            });
+        }
+
+        // Update URL preview on input and save to localStorage
+        document.querySelectorAll('input').forEach(el => {
+            el.addEventListener('input', () => {
+                updateUrl();
+                saveFields();
+            });
+        });
+
+        loadFields();
+        updateUrl();
+
+        // Check GitHub authentication on load
+        async function checkAuth() {
+            const el = document.getElementById('auth-status');
+            try {
+                const resp = await fetch('/github/rest/user');
+                const data = await resp.json();
+
+                if (resp.ok && data.login) {
+                    el.className = 'ok';
+                    el.innerHTML = `Authenticated as <strong>${data.login}</strong> (${data.name || 'no name'})`;
+                } else if (data.detail) {
+                    el.className = 'error';
+                    el.textContent = data.detail;
+                } else {
+                    el.className = 'error';
+                    el.textContent = 'Not authenticated';
+                }
+            } catch (e) {
+                el.className = 'error';
+                el.textContent = 'Error checking auth: ' + e.message;
+            }
+        }
+
+        checkAuth();
+    </script>
+</body>
+</html>
