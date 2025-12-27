@@ -2,7 +2,6 @@
 FastAPI application for the HTML notifications API.
 """
 
-import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -12,7 +11,13 @@ from fastapi.staticfiles import StaticFiles
 
 from ghsim.api.routes import router as notifications_router
 from ghsim.api.github_proxy import router as github_proxy_router
-from ghsim.api.fetcher import NotificationsFetcher, set_fetcher, get_fetcher
+from ghsim.api.fetcher import (
+    NotificationsFetcher,
+    set_fetcher,
+    get_fetcher,
+    run_fetcher_call,
+    shutdown_fetcher_executor,
+)
 
 
 @asynccontextmanager
@@ -30,8 +35,9 @@ async def lifespan(app: FastAPI):
     # sync API cannot be called from a different thread than it started in
     fetcher = get_fetcher()
     if fetcher:
-        await asyncio.to_thread(fetcher.stop)
+        await run_fetcher_call(fetcher.stop)
         set_fetcher(None)
+    shutdown_fetcher_executor()
 
 
 # Static files directory for the webapp

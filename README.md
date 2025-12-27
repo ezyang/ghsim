@@ -251,6 +251,9 @@ Features:
 - Remembers field values in localStorage
 - Pretty-printed JSON response
 
+Expanded notifications view:
+- `http://localhost:8000/app/expanded.html` for per-thread comment bundles with REST prefetching.
+
 ## Test Flows
 
 For testing notification behavior with two accounts:
@@ -308,6 +311,7 @@ ghsim/
 └── flows/                  # Test flow implementations
 
 webapp/
+├── expanded.html           # Expanded notifications UI
 └── index.html              # Debug UI
 
 tests/

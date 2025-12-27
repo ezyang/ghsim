@@ -2,7 +2,6 @@
 FastAPI route handlers for the HTML notifications API.
 """
 
-import asyncio
 import time
 from datetime import datetime
 from pathlib import Path
@@ -10,7 +9,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Query
 
-from ghsim.api.fetcher import get_fetcher
+from ghsim.api.fetcher import get_fetcher, run_fetcher_call
 from ghsim.api.models import NotificationsResponse
 from ghsim.parser.notifications import parse_notifications_html
 
@@ -79,7 +78,7 @@ async def get_repo_notifications(
     elif get_fetcher() is not None:
         fetcher = get_fetcher()
         assert fetcher is not None
-        result = await asyncio.to_thread(
+        result = await run_fetcher_call(
             fetcher.fetch_repo_notifications,
             owner=owner,
             repo=repo,
@@ -87,6 +86,7 @@ async def get_repo_notifications(
             after=after,
         )
         if result.status == "error":
+            print(f"[notifications] Fetch error for {owner}/{repo}: {result.error}")
             raise HTTPException(
                 status_code=502,
                 detail=f"Failed to fetch from GitHub: {result.error}",
@@ -139,7 +139,7 @@ async def timing_profile(
 
     # Measure fetch (in thread pool)
     t0 = time.perf_counter()
-    result = await asyncio.to_thread(
+    result = await run_fetcher_call(
         fetcher.fetch_repo_notifications,
         owner=owner,
         repo=repo,

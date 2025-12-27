@@ -4,9 +4,11 @@ Live HTML fetcher using Playwright.
 Fetches notifications HTML from GitHub using an authenticated browser session.
 """
 
+import asyncio
 import time
 import urllib.parse
 from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from playwright.sync_api import sync_playwright, BrowserContext
@@ -104,9 +106,10 @@ class NotificationsFetcher:
         if after:
             url += f"&after={urllib.parse.quote(after)}"
 
-        try:
-            timing = {}
+        timing: dict[str, int] = {}
+        page = None
 
+        try:
             t0 = time.perf_counter()
             page = self._context.new_page()
             timing["new_page_ms"] = int((time.perf_counter() - t0) * 1000)
@@ -134,11 +137,22 @@ class NotificationsFetcher:
             return FetchResult(html=html, url=url, timing=timing)
 
         except Exception as e:
+            error_text = f"{type(e).__name__}: {e}"
+            print(f"[fetcher] Failed to fetch notifications page: {error_text}")
+            print(f"[fetcher] URL: {url}")
+            if timing:
+                print(f"[fetcher] Timing: {timing}")
+            if page is not None:
+                try:
+                    page.close()
+                except Exception as close_error:
+                    print(f"[fetcher] Failed to close page: {close_error}")
             return FetchResult(
                 html="",
                 url=url,
                 status="error",
-                error=str(e),
+                error=error_text,
+                timing=timing,
             )
 
     def __enter__(self) -> "NotificationsFetcher":
@@ -147,6 +161,19 @@ class NotificationsFetcher:
 
     def __exit__(self, *args: Any) -> None:
         self.stop()
+
+
+# Single-thread executor to keep Playwright sync API on one thread.
+_fetch_executor = ThreadPoolExecutor(max_workers=1)
+
+
+async def run_fetcher_call(func, *args, **kwargs):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(_fetch_executor, lambda: func(*args, **kwargs))
+
+
+def shutdown_fetcher_executor() -> None:
+    _fetch_executor.shutdown(wait=False)
 
 
 # Global fetcher instance (set by server on startup)

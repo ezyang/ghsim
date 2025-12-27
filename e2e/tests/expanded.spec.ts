@@ -25,6 +25,25 @@ test.describe('Expanded Notifications', () => {
       });
     });
 
+    await page.route('**/github/rest/notifications**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'rest-thread-1',
+            last_read_at: '2025-01-01T00:00:00Z',
+            unread: true,
+            repository: { full_name: 'testowner/testrepo' },
+            subject: {
+              type: 'Issue',
+              url: 'https://api.github.com/repos/testowner/testrepo/issues/1',
+            },
+          },
+        ]),
+      });
+    });
+
     await page.route(
       '**/github/rest/repos/testowner/testrepo/issues/1/comments**',
       (route) => {
@@ -44,8 +63,7 @@ test.describe('Expanded Notifications', () => {
       }
     );
 
-    await page.locator('#owner').fill('testowner');
-    await page.locator('#repo').fill('testrepo');
+    await page.locator('#repo-input').fill('testowner/testrepo');
     await page.locator('#sync-btn').click();
 
     await expect(page.locator('.thread-card')).toHaveCount(1);
@@ -63,6 +81,35 @@ test.describe('Expanded Notifications', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(page1),
+      });
+    });
+
+    await page.route('**/github/rest/notifications**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'rest-thread-1',
+            last_read_at: '2025-01-01T00:00:00Z',
+            unread: true,
+            repository: { full_name: 'testowner/testrepo' },
+            subject: {
+              type: 'Issue',
+              url: 'https://api.github.com/repos/testowner/testrepo/issues/1',
+            },
+          },
+          {
+            id: 'rest-thread-2',
+            last_read_at: '2025-01-01T01:30:00Z',
+            unread: false,
+            repository: { full_name: 'testowner/testrepo' },
+            subject: {
+              type: 'Issue',
+              url: 'https://api.github.com/repos/testowner/testrepo/issues/2',
+            },
+          },
+        ]),
       });
     });
 
@@ -100,8 +147,7 @@ test.describe('Expanded Notifications', () => {
       }
     );
 
-    await page.locator('#owner').fill('testowner');
-    await page.locator('#repo').fill('testrepo');
+    await page.locator('#repo-input').fill('testowner/testrepo');
     await page.locator('#sync-btn').click();
 
     await expect(page.locator('.thread-card')).toHaveCount(1);
@@ -111,12 +157,116 @@ test.describe('Expanded Notifications', () => {
     expect(commentCalls).toBe(1);
   });
 
+  test('skips auto-prefetch when toggle is disabled', async ({ page }) => {
+    let commentCalls = 0;
+
+    await page.route('**/notifications/html/repo/testowner/testrepo', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(page1),
+      });
+    });
+
+    await page.route(
+      '**/github/rest/repos/testowner/testrepo/issues/1/comments**',
+      (route) => {
+        commentCalls += 1;
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([]),
+        });
+      }
+    );
+
+    await page.locator('#auto-prefetch').uncheck();
+    await page.locator('#repo-input').fill('testowner/testrepo');
+    await page.locator('#sync-btn').click();
+
+    await expect(page.locator('.thread-card')).toHaveCount(1);
+    await expect(page.locator('.comment-empty')).toContainText(
+      'Waiting on prefetch'
+    );
+    expect(commentCalls).toBe(0);
+  });
+
+  test('loads next page from footer button', async ({ page }) => {
+    await page.route('**/notifications/html/repo/testowner/testrepo', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(page1),
+      });
+    });
+
+    await page.route(
+      '**/notifications/html/repo/testowner/testrepo?after=cursor-2',
+      (route) => {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(page2),
+        });
+      }
+    );
+
+    await page.route(
+      '**/github/rest/repos/testowner/testrepo/issues/1/comments**',
+      (route) => {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([]),
+        });
+      }
+    );
+
+    await page.route(
+      '**/github/rest/repos/testowner/testrepo/issues/2/comments**',
+      (route) => {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([]),
+        });
+      }
+    );
+
+    await page.locator('#repo-input').fill('testowner/testrepo');
+    await page.locator('#sync-btn').click();
+
+    await expect(page.locator('#load-more-footer')).toBeEnabled();
+    await page.locator('#load-more-footer').click();
+
+    await expect(page.locator('.thread-card')).toHaveCount(2);
+  });
+
   test('shows prefetch errors inline', async ({ page }) => {
     await page.route('**/notifications/html/repo/testowner/testrepo', (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(page1),
+      });
+    });
+
+    await page.route('**/github/rest/notifications**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 'rest-thread-1',
+            last_read_at: '2025-01-01T00:00:00Z',
+            unread: true,
+            repository: { full_name: 'testowner/testrepo' },
+            subject: {
+              type: 'Issue',
+              url: 'https://api.github.com/repos/testowner/testrepo/issues/1',
+            },
+          },
+        ]),
       });
     });
 
@@ -131,8 +281,7 @@ test.describe('Expanded Notifications', () => {
       }
     );
 
-    await page.locator('#owner').fill('testowner');
-    await page.locator('#repo').fill('testrepo');
+    await page.locator('#repo-input').fill('testowner/testrepo');
     await page.locator('#sync-btn').click();
 
     await expect(page.locator('.comment-empty')).toContainText(

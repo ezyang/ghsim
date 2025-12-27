@@ -378,16 +378,13 @@
     <main>
         <section class="control-panel">
             <div>
-                <label for="owner">Owner</label>
-                <input id="owner" type="text" placeholder="octocat">
-            </div>
-            <div>
-                <label for="repo">Repo</label>
-                <input id="repo" type="text" placeholder="hello-world">
+                <label for="repo-input">Repository</label>
+                <input id="repo-input" type="text" placeholder="owner/repo">
             </div>
             <div class="button-row">
                 <button class="btn btn-primary" id="sync-btn">Sync Page</button>
                 <button class="btn" id="load-more-btn" disabled>Load Next Page</button>
+                <button class="btn" id="refresh-read-at-btn">Refresh Read At</button>
             </div>
             <div class="toggle">
                 <input id="auto-prefetch" type="checkbox" checked>
@@ -412,9 +409,9 @@
     <script>
         const COMMENT_CONCURRENCY = 4;
         const CACHE_KEY = "ghnotif_expanded_threads_v1";
+        const CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
         const state = {
-            owner: "",
             repo: "",
             notifications: [],
             pagination: { after: null, hasNext: false },
@@ -423,14 +420,17 @@
             queueRunning: false,
             autoPrefetch: true,
             cache: loadCache(),
+            rateLimit: null,
+            rateLimitError: null,
+            restCallsSinceRateLimit: 0,
         };
 
         const elements = {
-            owner: document.getElementById("owner"),
-            repo: document.getElementById("repo"),
+            repoInput: document.getElementById("repo-input"),
             syncBtn: document.getElementById("sync-btn"),
             loadMoreBtn: document.getElementById("load-more-btn"),
             loadMoreFooter: document.getElementById("load-more-footer"),
+            refreshReadAtBtn: document.getElementById("refresh-read-at-btn"),
             status: document.getElementById("status"),
             threads: document.getElementById("threads"),
             statsCard: document.getElementById("stats-card"),
@@ -474,15 +474,27 @@
 
         function updateStats() {
             const cachedCount = Object.keys(state.cache.threads).length;
+            const rateInfo = formatRateLimit(state.rateLimit, state.rateLimitError);
             elements.statsCard.innerHTML = `
                 <span>Threads: ${state.notifications.length}</span>
                 <span>Pages: ${state.pagesFetched}</span>
                 <span>Cached comments: ${cachedCount}</span>
+                <span>${rateInfo}</span>
             `;
         }
 
         function getNotificationKey(notification) {
             return String(notification.id);
+        }
+
+        function getNotificationMatchKey(notification) {
+            const repo = parseRepoInput(state.repo);
+            const number = notification?.subject?.number;
+            const type = notification?.subject?.type || "unknown";
+            if (repo && typeof number === "number") {
+                return `${repo.owner}/${repo.repo}:${type}:${number}`;
+            }
+            return `id:${getNotificationKey(notification)}`;
         }
 
         function getIssueNumber(notification) {
@@ -500,9 +512,21 @@
             });
         }
 
+        function isCacheEntryFresh(cached) {
+            if (!cached?.fetchedAt) {
+                return false;
+            }
+            const fetchedAtMs = Date.parse(cached.fetchedAt);
+            if (Number.isNaN(fetchedAtMs)) {
+                return false;
+            }
+            return Date.now() - fetchedAtMs < CACHE_TTL_MS;
+        }
+
         async function fetchNotificationsPage(afterCursor) {
-            if (!state.owner || !state.repo) {
-                setStatus("Enter owner and repo before syncing.", "error");
+            const repo = parseRepoInput(state.repo);
+            if (!repo) {
+                setStatus("Enter a repository in owner/repo format before syncing.", "error");
                 return null;
             }
 
@@ -510,7 +534,7 @@
             if (afterCursor) {
                 params.set("after", afterCursor);
             }
-            const url = `/notifications/html/repo/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}${params.toString() ? `?${params}` : ""}`;
+            const url = `/notifications/html/repo/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}${params.toString() ? `?${params}` : ""}`;
             setStatus(afterCursor ? "Fetching next page..." : "Fetching notifications...", "info");
             const response = await fetch(url);
             if (!response.ok) {
@@ -531,13 +555,15 @@
                     return;
                 }
 
-                mergeNotifications(payload.notifications || []);
+                const enriched = await enrichWithRestMetadata(payload.notifications || []);
+                mergeNotifications(enriched);
                 state.pagination.after = payload.pagination?.after_cursor || null;
                 state.pagination.hasNext = Boolean(payload.pagination?.has_next);
                 state.pagesFetched += 1;
 
                 render();
-                schedulePrefetch(payload.notifications || []);
+                schedulePrefetch(enriched);
+                await refreshRateLimitIfNeeded();
                 setStatus(`Loaded ${payload.notifications.length} threads`, "info");
             } catch (error) {
                 console.error(error);
@@ -554,12 +580,14 @@
                 if (!payload) {
                     return;
                 }
-                mergeNotifications(payload.notifications || []);
+                const enriched = await enrichWithRestMetadata(payload.notifications || []);
+                mergeNotifications(enriched);
                 state.pagination.after = payload.pagination?.after_cursor || null;
                 state.pagination.hasNext = Boolean(payload.pagination?.has_next);
                 state.pagesFetched += 1;
                 render();
-                schedulePrefetch(payload.notifications || []);
+                schedulePrefetch(enriched);
+                await refreshRateLimitIfNeeded();
                 setStatus(`Loaded ${payload.notifications.length} more threads`, "info");
             } catch (error) {
                 console.error(error);
@@ -595,7 +623,12 @@
         async function prefetchThread(notification) {
             const threadId = getNotificationKey(notification);
             const cached = state.cache.threads[threadId];
-            if (cached && cached.notificationUpdatedAt === notification.updated_at) {
+            if (
+                cached &&
+                cached.notificationUpdatedAt === notification.updated_at &&
+                cached.lastReadAt === (notification.last_read_at || null) &&
+                isCacheEntryFresh(cached)
+            ) {
                 return null;
             }
 
@@ -605,16 +638,28 @@
                     notificationUpdatedAt: notification.updated_at,
                     comments: [],
                     error: "No issue number found.",
+                    fetchedAt: new Date().toISOString(),
                 };
                 return threadId;
             }
 
             try {
-                const lastReadAt = notification.last_read_at || null;
-                let commentUrl = `/github/rest/repos/${encodeURIComponent(state.owner)}/${encodeURIComponent(state.repo)}/issues/${issueNumber}/comments`;
-                if (lastReadAt) {
-                    commentUrl += `?since=${encodeURIComponent(lastReadAt)}`;
+                const repo = parseRepoInput(state.repo);
+                if (!repo) {
+                    throw new Error("Missing repository input.");
                 }
+                const lastReadAt = notification.last_read_at || cached?.lastReadAt || null;
+                if (!lastReadAt) {
+                    state.cache.threads[threadId] = {
+                        notificationUpdatedAt: notification.updated_at,
+                        comments: [],
+                        error: "Missing last_read_at; cannot filter comments safely.",
+                        fetchedAt: new Date().toISOString(),
+                    };
+                    return threadId;
+                }
+                let commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
+                commentUrl += `?since=${encodeURIComponent(lastReadAt)}`;
                 const comments = await fetchJson(commentUrl);
 
                 state.cache.threads[threadId] = {
@@ -630,12 +675,14 @@
                     notificationUpdatedAt: notification.updated_at,
                     comments: [],
                     error: error.message || String(error),
+                    fetchedAt: new Date().toISOString(),
                 };
                 return threadId;
             }
         }
 
         async function fetchJson(url) {
+            state.restCallsSinceRateLimit += 1;
             const response = await fetch(url);
             if (!response.ok) {
                 let detail = "";
@@ -647,6 +694,175 @@
                 throw new Error(`Request failed: ${url} (${response.status}) ${detail}`);
             }
             return response.json();
+        }
+
+        async function enrichWithRestMetadata(notifications) {
+            const missing = notifications.filter((notif) => !notif.last_read_at);
+            if (!missing.length) {
+                return notifications;
+            }
+            const cachedLastReadAt = new Map();
+            missing.forEach((notif) => {
+                const cached = state.cache.threads[getNotificationKey(notif)];
+                if (cached?.lastReadAt && isCacheEntryFresh(cached)) {
+                    cachedLastReadAt.set(getNotificationKey(notif), cached.lastReadAt);
+                }
+            });
+            const missingKeys = new Set();
+            missing.forEach((notif) => {
+                if (cachedLastReadAt.has(getNotificationKey(notif))) {
+                    return;
+                }
+                const key = getNotificationMatchKey(notif);
+                if (key) {
+                    missingKeys.add(key);
+                }
+            });
+            const restMap =
+                missingKeys.size > 0
+                    ? await fetchRestNotificationsMap(missingKeys)
+                    : new Map();
+            return notifications.map((notif) => {
+                const cached = cachedLastReadAt.get(getNotificationKey(notif));
+                if (cached && !notif.last_read_at) {
+                    return { ...notif, last_read_at: cached };
+                }
+                const rest = restMap.get(getNotificationMatchKey(notif));
+                if (rest && rest.last_read_at && !notif.last_read_at) {
+                    return { ...notif, last_read_at: rest.last_read_at };
+                }
+                return notif;
+            });
+        }
+
+        async function fetchRestNotificationsMap(targetKeys) {
+            const result = new Map();
+            const maxPages = 5;
+            for (let page = 1; page <= maxPages; page += 1) {
+                const params = new URLSearchParams();
+                params.set("all", "true");
+                params.set("per_page", "50");
+                params.set("page", String(page));
+                const url = `/github/rest/notifications?${params}`;
+                let payload = [];
+                try {
+                    payload = await fetchJson(url);
+                } catch (error) {
+                    setStatus(`Rate limit fetch failed: ${error.message || error}`, "error");
+                    break;
+                }
+                if (!Array.isArray(payload) || payload.length === 0) {
+                    break;
+                }
+                payload.forEach((notif) => {
+                    const key = getRestNotificationMatchKey(notif);
+                    if (key && targetKeys.has(key)) {
+                        result.set(key, notif);
+                    }
+                });
+                const remaining = [...targetKeys].filter((id) => !result.has(id));
+                if (remaining.length === 0) {
+                    break;
+                }
+            }
+            return result;
+        }
+
+        function getRestNotificationMatchKey(notification) {
+            const repo = notification?.repository?.full_name;
+            const type = notification?.subject?.type || "unknown";
+            const url = notification?.subject?.url || "";
+            const match = url.match(/\/(issues|pulls)\/(\d+)/);
+            if (!repo || !match) {
+                return null;
+            }
+            return `${repo}:${type}:${match[2]}`;
+        }
+
+        async function refreshRateLimit() {
+            try {
+                const response = await fetch("/github/rest/rate_limit");
+                if (!response.ok) {
+                    throw new Error(`Request failed (${response.status})`);
+                }
+                const data = await response.json();
+                state.rateLimit = data;
+                state.rateLimitError = null;
+                updateStats();
+            } catch (error) {
+                state.rateLimitError = error.message || String(error);
+                updateStats();
+            }
+        }
+
+        async function refreshRateLimitIfNeeded() {
+            if (state.restCallsSinceRateLimit === 0) {
+                return;
+            }
+            try {
+                await refreshRateLimit();
+            } finally {
+                state.restCallsSinceRateLimit = 0;
+            }
+        }
+
+        async function refreshReadAtFromRest() {
+            if (!state.notifications.length) {
+                setStatus("Nothing to refresh; sync notifications first.", "error");
+                return;
+            }
+            const targetKeys = new Set();
+            state.notifications.forEach((notif) => {
+                const key = getNotificationMatchKey(notif);
+                if (key) {
+                    targetKeys.add(key);
+                }
+            });
+            if (targetKeys.size === 0) {
+                setStatus("No REST-matchable notifications found.", "error");
+                return;
+            }
+            setStatus("Refreshing last read timestamps...", "info");
+            try {
+                const restMap = await fetchRestNotificationsMap(targetKeys);
+                state.notifications = state.notifications.map((notif) => {
+                    const rest = restMap.get(getNotificationMatchKey(notif));
+                    if (rest?.last_read_at) {
+                        const updated = { ...notif, last_read_at: rest.last_read_at };
+                        const threadId = getNotificationKey(notif);
+                        const cached = state.cache.threads[threadId] || {};
+                        state.cache.threads[threadId] = {
+                            ...cached,
+                            notificationUpdatedAt: updated.updated_at,
+                            lastReadAt: rest.last_read_at,
+                            fetchedAt: new Date().toISOString(),
+                        };
+                        return updated;
+                    }
+                    return notif;
+                });
+                render();
+                saveCache();
+                await refreshRateLimitIfNeeded();
+                setStatus("Last read timestamps refreshed.", "info");
+            } catch (error) {
+                console.error(error);
+                setStatus(error.message, "error");
+            }
+        }
+
+        function formatRateLimit(rateLimit, error) {
+            if (error) {
+                return `Rate limit error: ${escapeHtml(error)}`;
+            }
+            if (!rateLimit || !rateLimit.resources || !rateLimit.resources.core) {
+                return "Rate limit: unknown";
+            }
+            const core = rateLimit.resources.core;
+            const resetAt = core.reset
+                ? new Date(core.reset * 1000).toLocaleTimeString()
+                : "unknown";
+            return `Rate limit: ${core.remaining}/${core.limit} reset @ ${resetAt}`;
         }
 
         function render() {
@@ -763,26 +979,18 @@
         }
 
         function init() {
-            const cachedOwner = localStorage.getItem("ghnotif_owner");
             const cachedRepo = localStorage.getItem("ghnotif_repo");
-            if (cachedOwner) {
-                elements.owner.value = cachedOwner;
-                state.owner = cachedOwner;
-            }
             if (cachedRepo) {
-                elements.repo.value = cachedRepo;
+                elements.repoInput.value = cachedRepo;
                 state.repo = cachedRepo;
             }
             elements.autoPrefetch.checked = state.autoPrefetch;
             updateStats();
+            refreshRateLimit();
+            setInterval(refreshRateLimit, 60000);
         }
 
-        elements.owner.addEventListener("input", (event) => {
-            state.owner = event.target.value.trim();
-            localStorage.setItem("ghnotif_owner", state.owner);
-        });
-
-        elements.repo.addEventListener("input", (event) => {
+        elements.repoInput.addEventListener("input", (event) => {
             state.repo = event.target.value.trim();
             localStorage.setItem("ghnotif_repo", state.repo);
         });
@@ -797,8 +1005,21 @@
         elements.syncBtn.addEventListener("click", syncFirstPage);
         elements.loadMoreBtn.addEventListener("click", loadNextPage);
         elements.loadMoreFooter.addEventListener("click", loadNextPage);
+        elements.refreshReadAtBtn.addEventListener("click", refreshReadAtFromRest);
 
         init();
+
+        function parseRepoInput(value) {
+            const trimmed = value.trim();
+            if (!trimmed) {
+                return null;
+            }
+            const parts = trimmed.split("/");
+            if (parts.length !== 2 || !parts[0] || !parts[1]) {
+                return null;
+            }
+            return { owner: parts[0], repo: parts[1] };
+        }
     </script>
 </body>
 </html>
