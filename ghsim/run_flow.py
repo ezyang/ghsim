@@ -7,6 +7,7 @@ Usage:
 Available flows:
     basic             - Basic notification generation test
     comment_fetch_marks_read - Check if API comment fetch flips read state
+    comment_prefetch_validation - Validate last_read_at for comment prefetching
     notification_timestamps - Probe notification timestamp meaning and event loading
     pagination        - Generate 26+ notifications to test pagination
     read_vs_done      - Test read vs done state visibility in API
@@ -19,6 +20,7 @@ import sys
 from ghsim.flows import (
     BasicNotificationFlow,
     CommentFetchMarksReadFlow,
+    CommentPrefetchValidationFlow,
     NotificationTimestampsFlow,
     PaginationFlow,
     ParserValidationFlow,
@@ -29,6 +31,7 @@ from ghsim.flows import (
 FLOWS = {
     "basic": BasicNotificationFlow,
     "comment_fetch_marks_read": CommentFetchMarksReadFlow,
+    "comment_prefetch_validation": CommentPrefetchValidationFlow,
     "notification_timestamps": NotificationTimestampsFlow,
     "pagination": PaginationFlow,
     "read_vs_done": ReadVsDoneFlow,
@@ -44,6 +47,7 @@ def main():
 Available flows:
   basic             - Basic notification generation and visibility test
   comment_fetch_marks_read - Check if API comment fetch flips read state
+  comment_prefetch_validation - Validate last_read_at for comment prefetching
   notification_timestamps - Probe notification timestamp meaning and event loading
   pagination        - Generate 26+ notifications to test pagination
   read_vs_done      - Test whether API can distinguish read from done notifications

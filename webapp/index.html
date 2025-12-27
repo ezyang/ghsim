@@ -46,6 +46,28 @@
             color: white;
         }
 
+        .app-header .header-inner {
+            max-width: 1012px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .header-link {
+            color: white;
+            text-decoration: none;
+            font-size: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.35);
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+
+        .header-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
         .app-header h1 {
             margin: 0;
             font-size: 16px;
@@ -570,7 +592,10 @@
 </head>
 <body>
     <header class="app-header">
-        <h1>GitHub Notifications</h1>
+        <div class="header-inner">
+            <h1>GitHub Notifications</h1>
+            <a class="header-link" href="/app/expanded.html">Expanded view</a>
+        </div>
     </header>
 
     <main class="container">
