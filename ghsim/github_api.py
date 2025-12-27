@@ -130,6 +130,15 @@ class GitHubAPI:
         payload = {"permission": permission} if permission else None
         self.put(f"/repos/{owner}/{repo}/collaborators/{username}", payload)
 
+    def get_repository_invitations(self) -> list[Any]:
+        """List repository invitations for the authenticated user."""
+        result = self.get("/user/repository_invitations")
+        return result if isinstance(result, list) else []
+
+    def accept_repository_invitation(self, invitation_id: int) -> None:
+        """Accept a repository invitation by ID."""
+        self.patch(f"/user/repository_invitations/{invitation_id}")
+
     def get_notifications(
         self, all_notifications: bool = False, participating: bool = False
     ) -> list[Any]:

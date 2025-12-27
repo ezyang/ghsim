@@ -40,6 +40,7 @@ def get_token() -> str | None:
     methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
     summary="GitHub REST API proxy",
     description="Proxies requests to GitHub's REST API with authentication.",
+    include_in_schema=False,
 )
 async def rest_proxy(path: str, request: Request) -> Response:
     """

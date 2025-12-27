@@ -74,6 +74,7 @@ class BaseFlow(ABC):
     def setup_test_repo(self) -> bool:
         """Create a test repository and set up watching."""
         assert self.owner_api is not None, "Must call validate_prerequisites first"
+        assert self.trigger_api is not None, "Must call validate_prerequisites first"
 
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
         self.repo_name = f"ghsim-test-{timestamp}"
@@ -96,12 +97,39 @@ class BaseFlow(ABC):
             permission="push",
         )
         print(f"Added {self.trigger_username} as collaborator")
+        self._accept_repository_invitation()
 
         # Watch the repo
         self.owner_api.watch_repo(self.owner_username, self.repo_name)
         print(f"Now watching {self.owner_username}/{self.repo_name}")
 
         return True
+
+    def _accept_repository_invitation(
+        self, max_attempts: int = 6, wait_seconds: int = 3
+    ) -> None:
+        """Accept the pending repository invitation for the trigger account."""
+        assert self.trigger_api is not None, "Must call validate_prerequisites first"
+
+        for attempt in range(max_attempts):
+            invitations = self.trigger_api.get_repository_invitations()
+            for invitation in invitations:
+                repo = invitation.get("repository", {})
+                if (
+                    repo.get("owner", {}).get("login") == self.owner_username
+                    and repo.get("name") == self.repo_name
+                ):
+                    invitation_id = invitation.get("id")
+                    if isinstance(invitation_id, int):
+                        self.trigger_api.accept_repository_invitation(invitation_id)
+                        print(
+                            f"Accepted collaborator invitation for {self.owner_username}/{self.repo_name}"
+                        )
+                        return
+            if attempt < max_attempts - 1:
+                time.sleep(wait_seconds)
+
+        raise RuntimeError("Timed out waiting for collaborator invitation acceptance.")
 
     def create_test_issue(self) -> Any:
         """Create a test issue from the trigger account."""
