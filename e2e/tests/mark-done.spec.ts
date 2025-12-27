@@ -1,12 +1,24 @@
 import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
 
-// Fixture with realistic GitHub node IDs (like real notifications have)
+// Helper to encode a thread_id into a node ID format
+// Real GitHub node IDs are base64 encoded and contain "thread_id:user_id"
+function encodeNodeId(threadId: number, userId: number = 26517921): string {
+  // The format is: binary prefix + "thread_id:user_id"
+  // We use a simple prefix that matches GitHub's format
+  const data = `\x93\x00\xce\x01\x94\xa1\xa1\xb4${threadId}:${userId}`;
+  // Base64 encode (browser-compatible)
+  const base64 = Buffer.from(data, 'binary').toString('base64');
+  return `NT_${base64}`;
+}
+
+// Fixture with realistic GitHub node IDs that contain extractable thread IDs
 const fixtureWithNodeIds = {
   ...mixedFixture,
   notifications: mixedFixture.notifications.map((n, i) => ({
     ...n,
-    id: `NT_kwDNNPyxMjE0NjQyMDU0MjA6MTM1Ng${i}`, // Realistic node ID format
+    // Use realistic thread IDs that can be extracted (10+ digits)
+    id: encodeNodeId(21474444000 + i),
   })),
 };
 
@@ -402,7 +414,8 @@ test.describe('Mark Done', () => {
 
 /**
  * Tests for Mark Done with realistic GitHub node IDs.
- * GitHub's HTML notifications use node IDs (NT_...) which require GraphQL API.
+ * GitHub's HTML notifications use node IDs (NT_...) which are decoded
+ * to extract the thread_id for use with the REST API.
  */
 test.describe('Mark Done with Node IDs', () => {
   test.beforeEach(async ({ page }) => {
@@ -431,25 +444,13 @@ test.describe('Mark Done with Node IDs', () => {
     await expect(page.locator('#status-bar')).toContainText('Synced 5 notifications');
   });
 
-  test('uses GraphQL API for node IDs', async ({ page }) => {
-    let graphqlCalled = false;
-    let graphqlBody: { query?: string; variables?: { input?: { id?: string } } } | null = null;
+  test('extracts thread_id from node ID and uses REST API', async ({ page }) => {
+    const apiCalls: string[] = [];
 
-    // Mock GraphQL endpoint
-    await page.route('**/github/graphql', async (route) => {
-      graphqlCalled = true;
-      graphqlBody = route.request().postDataJSON();
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: {
-            markNotificationsAsDone: {
-              success: true,
-            },
-          },
-        }),
-      });
+    // Mock REST API endpoint
+    await page.route('**/github/rest/notifications/threads/**', async (route) => {
+      apiCalls.push(route.request().url());
+      route.fulfill({ status: 205 });
     });
 
     // Select first item (which has a node ID)
@@ -462,63 +463,43 @@ test.describe('Mark Done with Node IDs', () => {
     // Should succeed
     await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
 
-    // Should have used GraphQL
-    expect(graphqlCalled).toBe(true);
-    expect(graphqlBody?.query).toContain('markNotificationsAsDone');
+    // Should have used REST API with extracted thread_id
+    expect(apiCalls.length).toBe(1);
+    // The extracted thread_id should be a large number (21474444000)
+    expect(apiCalls[0]).toContain('/threads/21474444000');
   });
 
-  test('GraphQL request includes correct node ID', async ({ page }) => {
-    let capturedId: string | undefined;
+  test('REST API uses PATCH method for node IDs', async ({ page }) => {
+    let requestMethod = '';
 
-    await page.route('**/github/graphql', async (route) => {
-      const body = route.request().postDataJSON();
-      capturedId = body?.variables?.input?.id;
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: { markNotificationsAsDone: { success: true } },
-        }),
-      });
+    await page.route('**/github/rest/notifications/threads/**', async (route) => {
+      requestMethod = route.request().method();
+      route.fulfill({ status: 205 });
     });
 
     await page.locator('.notification-item').first().locator('.notification-checkbox').click();
     await page.locator('#mark-done-btn').click();
 
     await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
-
-    // ID should start with NT_ (node ID format)
-    expect(capturedId).toMatch(/^NT_/);
+    expect(requestMethod).toBe('PATCH');
   });
 
-  test('handles GraphQL errors gracefully', async ({ page }) => {
-    await page.route('**/github/graphql', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          errors: [{ message: 'Not found' }],
-        }),
-      });
+  test('handles REST API errors for node IDs gracefully', async ({ page }) => {
+    await page.route('**/github/rest/notifications/threads/**', (route) => {
+      route.fulfill({ status: 500 });
     });
 
     await page.locator('.notification-item').first().locator('.notification-checkbox').click();
     await page.locator('#mark-done-btn').click();
 
     await expect(page.locator('#status-bar')).toContainText('Failed to mark notifications');
-    await expect(page.locator('#status-bar')).toContainText('Not found');
+    await expect(page.locator('#status-bar')).toContainText('500');
     await expect(page.locator('#status-bar')).toHaveClass(/error/);
   });
 
-  test('removes notification after successful GraphQL mark done', async ({ page }) => {
-    await page.route('**/github/graphql', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          data: { markNotificationsAsDone: { success: true } },
-        }),
-      });
+  test('removes notification after successful REST API mark done with node ID', async ({ page }) => {
+    await page.route('**/github/rest/notifications/threads/**', (route) => {
+      route.fulfill({ status: 205 });
     });
 
     await expect(page.locator('.notification-item')).toHaveCount(5);

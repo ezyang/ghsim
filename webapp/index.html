@@ -990,99 +990,79 @@
             return typeof id === 'string' && /^[A-Z]+_/.test(id);
         }
 
-        // Mark a single notification as done using the appropriate API
+        // Extract REST API thread_id from a GitHub node ID
+        // Node IDs are base64 encoded and contain "thread_id:user_id"
+        function extractThreadIdFromNodeId(nodeId) {
+            if (!nodeId.startsWith('NT_')) {
+                return null;
+            }
+
+            try {
+                const suffix = nodeId.slice(3); // Remove 'NT_'
+                // Base64 decode
+                const decoded = atob(suffix);
+                // Extract thread_id:user_id pattern (the numeric part after binary prefix)
+                const match = decoded.match(/(\d{10,}):\d+/);
+                if (match) {
+                    return match[1];
+                }
+            } catch (e) {
+                console.error(`[MarkDone] Failed to decode node ID ${nodeId}:`, e);
+            }
+
+            return null;
+        }
+
+        // Mark a single notification as done using the REST API
         async function markNotificationDone(notifId) {
             console.log(`[MarkDone] Attempting to mark notification: ${notifId}`);
-            console.log(`[MarkDone] ID type: ${isNodeId(notifId) ? 'Node ID (GraphQL)' : 'Numeric ID (REST)'}`);
 
+            let threadId = notifId;
+
+            // If it's a node ID, extract the REST API thread_id
             if (isNodeId(notifId)) {
-                // Use GraphQL API for node IDs
-                const query = `
-                    mutation MarkNotificationDone($input: MarkNotificationsAsDoneInput!) {
-                        markNotificationsAsDone(input: $input) {
-                            success
-                        }
-                    }
-                `;
-
-                const requestBody = {
-                    query,
-                    variables: {
-                        input: { id: notifId }
-                    }
-                };
-
-                console.log(`[MarkDone] GraphQL request:`, JSON.stringify(requestBody, null, 2));
-
-                const response = await fetch('/github/graphql', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(requestBody),
-                });
-
-                console.log(`[MarkDone] GraphQL response status: ${response.status} ${response.statusText}`);
-
-                // Read response body
-                const responseText = await response.text();
-                console.log(`[MarkDone] GraphQL response body:`, responseText);
-
-                if (!response.ok) {
-                    const error = `GraphQL HTTP error: ${response.status} ${response.statusText}`;
+                console.log(`[MarkDone] ID is a node ID, extracting thread_id...`);
+                const extracted = extractThreadIdFromNodeId(notifId);
+                if (!extracted) {
+                    const error = `Failed to extract thread_id from node ID: ${notifId}`;
                     console.error(`[MarkDone] ${error}`);
-                    return { success: false, error, status: response.status, responseBody: responseText };
+                    return { success: false, error };
                 }
-
-                let data;
-                try {
-                    data = JSON.parse(responseText);
-                } catch (parseError) {
-                    const error = `Failed to parse GraphQL response: ${parseError.message}`;
-                    console.error(`[MarkDone] ${error}`);
-                    return { success: false, error, responseBody: responseText };
-                }
-
-                // Check for GraphQL errors
-                if (data.errors && data.errors.length > 0) {
-                    const error = `GraphQL error: ${data.errors.map(e => e.message).join(', ')}`;
-                    console.error(`[MarkDone] ${error}`);
-                    return { success: false, error, errors: data.errors };
-                }
-
-                console.log(`[MarkDone] GraphQL success for ${notifId}`);
-                return { success: true };
-            } else {
-                // Use REST API for numeric thread IDs
-                const url = `/github/rest/notifications/threads/${notifId}`;
-                console.log(`[MarkDone] REST request: PATCH ${url}`);
-
-                const response = await fetch(url, {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({}),
-                });
-
-                console.log(`[MarkDone] REST response status: ${response.status} ${response.statusText}`);
-
-                if (response.status === 429) {
-                    const retryAfter = response.headers.get('Retry-After');
-                    console.warn(`[MarkDone] Rate limited, retry after: ${retryAfter}s`);
-                    return {
-                        success: false,
-                        rateLimited: true,
-                        retryAfter: retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000
-                    };
-                }
-
-                if (!response.ok && response.status !== 205) {
-                    const responseText = await response.text();
-                    const error = `REST error: ${response.status} ${response.statusText}`;
-                    console.error(`[MarkDone] ${error}`, responseText);
-                    return { success: false, error, status: response.status, responseBody: responseText };
-                }
-
-                console.log(`[MarkDone] REST success for ${notifId}`);
-                return { success: true };
+                threadId = extracted;
+                console.log(`[MarkDone] Extracted thread_id: ${threadId}`);
             }
+
+            // Use REST API with the thread_id
+            const url = `/github/rest/notifications/threads/${threadId}`;
+            console.log(`[MarkDone] REST request: PATCH ${url}`);
+
+            const response = await fetch(url, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({}),
+            });
+
+            console.log(`[MarkDone] REST response status: ${response.status} ${response.statusText}`);
+
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After');
+                console.warn(`[MarkDone] Rate limited, retry after: ${retryAfter}s`);
+                return {
+                    success: false,
+                    rateLimited: true,
+                    retryAfter: retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000
+                };
+            }
+
+            if (!response.ok && response.status !== 205) {
+                const responseText = await response.text();
+                const error = `REST error: ${response.status} ${response.statusText}`;
+                console.error(`[MarkDone] ${error}`, responseText);
+                return { success: false, error, status: response.status, responseBody: responseText };
+            }
+
+            console.log(`[MarkDone] REST success for ${notifId} (thread_id: ${threadId})`);
+            return { success: true };
         }
 
         // Handle keyboard shortcuts
