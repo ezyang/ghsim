@@ -34,3 +34,7 @@ responses/
 
 # GitHub API tokens
 *.token
+
+# Webapp testing artifacts
+webapp/test-results/
+webapp/playwright-report/

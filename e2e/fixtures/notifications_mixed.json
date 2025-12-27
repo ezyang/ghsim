@@ -1,0 +1,141 @@
+{
+  "source_url": "https://github.com/notifications?query=repo:test/repo",
+  "generated_at": "2024-12-27T12:00:00Z",
+  "repository": {
+    "owner": "test",
+    "name": "repo",
+    "full_name": "test/repo"
+  },
+  "notifications": [
+    {
+      "id": "notif-1",
+      "unread": true,
+      "reason": "author",
+      "updated_at": "2024-12-27T11:30:00Z",
+      "subject": {
+        "title": "Fix critical bug in authentication",
+        "url": "https://github.com/test/repo/issues/42",
+        "type": "Issue",
+        "number": 42,
+        "state": "open",
+        "state_reason": null
+      },
+      "actors": [
+        {
+          "login": "alice",
+          "avatar_url": "https://avatars.githubusercontent.com/u/1?v=4"
+        }
+      ],
+      "ui": {
+        "saved": false,
+        "done": false
+      }
+    },
+    {
+      "id": "notif-2",
+      "unread": false,
+      "reason": "review_requested",
+      "updated_at": "2024-12-27T10:00:00Z",
+      "subject": {
+        "title": "Add new feature for user profiles",
+        "url": "https://github.com/test/repo/pull/43",
+        "type": "PullRequest",
+        "number": 43,
+        "state": "open",
+        "state_reason": null
+      },
+      "actors": [
+        {
+          "login": "bob",
+          "avatar_url": "https://avatars.githubusercontent.com/u/2?v=4"
+        },
+        {
+          "login": "charlie",
+          "avatar_url": "https://avatars.githubusercontent.com/u/3?v=4"
+        }
+      ],
+      "ui": {
+        "saved": true,
+        "done": false
+      }
+    },
+    {
+      "id": "notif-3",
+      "unread": false,
+      "reason": "mention",
+      "updated_at": "2024-12-26T15:00:00Z",
+      "subject": {
+        "title": "Update documentation for API endpoints",
+        "url": "https://github.com/test/repo/issues/41",
+        "type": "Issue",
+        "number": 41,
+        "state": "closed",
+        "state_reason": "completed"
+      },
+      "actors": [
+        {
+          "login": "diana",
+          "avatar_url": "https://avatars.githubusercontent.com/u/4?v=4"
+        }
+      ],
+      "ui": {
+        "saved": false,
+        "done": false
+      }
+    },
+    {
+      "id": "notif-4",
+      "unread": true,
+      "reason": "subscribed",
+      "updated_at": "2024-12-26T12:00:00Z",
+      "subject": {
+        "title": "Refactor database layer",
+        "url": "https://github.com/test/repo/pull/40",
+        "type": "PullRequest",
+        "number": 40,
+        "state": "merged",
+        "state_reason": null
+      },
+      "actors": [
+        {
+          "login": "eve",
+          "avatar_url": "https://avatars.githubusercontent.com/u/5?v=4"
+        }
+      ],
+      "ui": {
+        "saved": false,
+        "done": false
+      }
+    },
+    {
+      "id": "notif-5",
+      "unread": false,
+      "reason": "comment",
+      "updated_at": "2024-12-25T09:00:00Z",
+      "subject": {
+        "title": "Won't fix: Legacy code cleanup",
+        "url": "https://github.com/test/repo/issues/39",
+        "type": "Issue",
+        "number": 39,
+        "state": "closed",
+        "state_reason": "not_planned"
+      },
+      "actors": [
+        {
+          "login": "frank",
+          "avatar_url": "https://avatars.githubusercontent.com/u/6?v=4"
+        }
+      ],
+      "ui": {
+        "saved": false,
+        "done": false
+      }
+    }
+  ],
+  "pagination": {
+    "before_cursor": null,
+    "after_cursor": null,
+    "has_previous": false,
+    "has_next": false
+  }
+}

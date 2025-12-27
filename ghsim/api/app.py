@@ -2,6 +2,7 @@
 FastAPI application for the HTML notifications API.
 """
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -25,10 +26,11 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # Cleanup on shutdown
+    # Cleanup on shutdown - must run in thread pool because Playwright's
+    # sync API cannot be called from a different thread than it started in
     fetcher = get_fetcher()
     if fetcher:
-        fetcher.stop()
+        await asyncio.to_thread(fetcher.stop)
         set_fetcher(None)
 
 # Static files directory for the webapp

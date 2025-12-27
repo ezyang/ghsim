@@ -26,7 +26,8 @@ def main() -> int:
         "--account",
         "-a",
         help="ghsim account name for live GitHub fetching. "
-        "Must have valid auth (run: python -m ghsim.auth ACCOUNT)",
+        "Must have valid auth (run: python -m ghsim.auth ACCOUNT). "
+        "Required unless --test is specified.",
     )
     parser.add_argument(
         "--host",
@@ -50,27 +51,34 @@ def main() -> int:
         action="store_true",
         help="Run browser in headed mode (visible window)",
     )
+    parser.add_argument(
+        "--test",
+        action="store_true",
+        help="Test mode: skip account validation (for E2E tests with mocked APIs)",
+    )
 
     args = parser.parse_args()
 
-    # Validate account if provided
-    if args.account:
+    # Set env vars so the app can recreate fetcher after reload
+    import os
+
+    if args.test:
+        print("Starting server in TEST MODE (no live fetching)")
+        # Don't set GHSIM_ACCOUNT - app will run without fetcher
+    else:
+        # Require account in non-test mode
+        if not args.account:
+            parser.error("--account is required (or use --test for testing)")
+
+        # Validate account
         if not has_valid_auth(args.account):
             print(f"ERROR: No valid auth for account '{args.account}'")
             print(f"Run: python -m ghsim.auth {args.account}")
             return 1
 
         print(f"Starting server with account: {args.account}")
-        print("Live GitHub fetching: ENABLED")
-
-        # Set env vars so the app can recreate fetcher after reload
-        import os
         os.environ["GHSIM_ACCOUNT"] = args.account
         os.environ["GHSIM_HEADLESS"] = "0" if args.headed else "1"
-    else:
-        print("Starting server without account (fixture-only mode)")
-        print("Live GitHub fetching: DISABLED")
-        print("Tip: Use --account ACCOUNT to enable live fetching")
 
     print(f"Server: http://{args.host}:{args.port}")
     print(f"API docs: http://{args.host}:{args.port}/docs")
