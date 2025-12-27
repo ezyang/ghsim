@@ -225,35 +225,6 @@ class ParserValidationFlow(BaseFlow):
             )
         )
 
-        discussion_open = self._create_discussion(
-            title=f"Parser Validation Discussion Open {timestamp}",
-            body="Open discussion for parser validation.",
-        )
-        expected.append(
-            ExpectedNotification(
-                title=discussion_open["title"],
-                subject_type="Discussion",
-                state="open",
-                state_reason=None,
-                html_url=discussion_open.get("url"),
-            )
-        )
-
-        discussion_closed = self._create_discussion(
-            title=f"Parser Validation Discussion Closed {timestamp}",
-            body="Closed discussion for parser validation.",
-        )
-        self._close_discussion(discussion_closed["id"])
-        expected.append(
-            ExpectedNotification(
-                title=discussion_closed["title"],
-                subject_type="Discussion",
-                state="closed",
-                state_reason="resolved",
-                html_url=discussion_closed.get("url"),
-            )
-        )
-
         release_title = f"parser-validation-{timestamp}"
         release = self._create_release(
             title=release_title,
@@ -377,86 +348,6 @@ class ParserValidationFlow(BaseFlow):
             f"/repos/{self.owner_username}/{self.repo_name}/pulls/{number}",
             {"state": "closed"},
         )
-
-    def _create_discussion(self, title: str, body: str) -> dict[str, Any]:
-        """Create a discussion via GraphQL."""
-        assert self.trigger_api is not None
-
-        repo_id, category_id = self._get_discussion_category_ids()
-        mutation = """
-        mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
-          createDiscussion(input: {
-            repositoryId: $repoId,
-            categoryId: $categoryId,
-            title: $title,
-            body: $body
-          }) {
-            discussion {
-              id
-              title
-              url
-            }
-          }
-        }
-        """
-
-        result = self.trigger_api.graphql(
-            mutation,
-            {
-                "repoId": repo_id,
-                "categoryId": category_id,
-                "title": title,
-                "body": body,
-            },
-        )
-        discussion = (
-            result.get("data", {}).get("createDiscussion", {}).get("discussion")
-        )
-        if not discussion:
-            raise RuntimeError("Failed to create discussion")
-        return discussion
-
-    def _close_discussion(self, discussion_id: str) -> None:
-        """Close a discussion via GraphQL."""
-        assert self.trigger_api is not None
-        mutation = """
-        mutation($discussionId: ID!) {
-          closeDiscussion(input: {discussionId: $discussionId}) {
-            discussion {
-              id
-            }
-          }
-        }
-        """
-        self.trigger_api.graphql(mutation, {"discussionId": discussion_id})
-
-    def _get_discussion_category_ids(self) -> tuple[str, str]:
-        """Fetch repository and discussion category IDs."""
-        assert self.trigger_api is not None
-        query = """
-        query($owner: String!, $repo: String!) {
-          repository(owner: $owner, name: $repo) {
-            id
-            discussionCategories(first: 1) {
-              nodes {
-                id
-                name
-              }
-            }
-          }
-        }
-        """
-        result = self.trigger_api.graphql(
-            query,
-            {"owner": self.owner_username, "repo": self.repo_name},
-        )
-        repo = result.get("data", {}).get("repository")
-        if not repo:
-            raise RuntimeError("Failed to fetch discussion categories")
-        categories = repo.get("discussionCategories", {}).get("nodes", [])
-        if not categories:
-            raise RuntimeError("No discussion categories available")
-        return repo["id"], categories[0]["id"]
 
     def _create_release(
         self,

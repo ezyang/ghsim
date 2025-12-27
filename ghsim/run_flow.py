@@ -6,6 +6,7 @@ Usage:
 
 Available flows:
     basic             - Basic notification generation test
+    notification_timestamps - Probe notification timestamp meaning and event loading
     pagination        - Generate 26+ notifications to test pagination
     read_vs_done      - Test read vs done state visibility in API
     parser_validation - Validate HTML parser against API notifications
@@ -16,6 +17,7 @@ import sys
 
 from ghsim.flows import (
     BasicNotificationFlow,
+    NotificationTimestampsFlow,
     PaginationFlow,
     ParserValidationFlow,
     ReadVsDoneFlow,
@@ -24,6 +26,7 @@ from ghsim.flows import (
 
 FLOWS = {
     "basic": BasicNotificationFlow,
+    "notification_timestamps": NotificationTimestampsFlow,
     "pagination": PaginationFlow,
     "read_vs_done": ReadVsDoneFlow,
     "parser_validation": ParserValidationFlow,
@@ -37,6 +40,7 @@ def main():
         epilog="""
 Available flows:
   basic             - Basic notification generation and visibility test
+  notification_timestamps - Probe notification timestamp meaning and event loading
   pagination        - Generate 26+ notifications to test pagination
   read_vs_done      - Test whether API can distinguish read from done notifications
   parser_validation - Validate HTML parser against API notifications

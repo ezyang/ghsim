@@ -22,7 +22,7 @@ from ghsim.auth import (
 TOKEN_DIR = Path("auth_state")
 
 # Scopes for test accounts (can create/delete repos)
-TEST_SCOPES = ["repo", "notifications", "delete_repo"]
+TEST_SCOPES = ["repo", "notifications", "delete_repo", "write:discussion"]
 
 # Scopes for prod accounts (read-only, no destructive operations)
 PROD_SCOPES = ["repo", "notifications"]

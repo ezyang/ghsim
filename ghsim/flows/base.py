@@ -76,7 +76,7 @@ class BaseFlow(ABC):
         assert self.owner_api is not None, "Must call validate_prerequisites first"
         assert self.trigger_api is not None, "Must call validate_prerequisites first"
 
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
         self.repo_name = f"ghsim-test-{timestamp}"
 
         print(f"\n{'=' * 60}")
