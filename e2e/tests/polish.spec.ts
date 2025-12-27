@@ -28,7 +28,7 @@ test.describe('Polish', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 

@@ -25,7 +25,7 @@ test.describe('UI Shell', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
   });
 
   test.describe('Header', () => {
@@ -34,7 +34,7 @@ test.describe('UI Shell', () => {
       await expect(header).toBeVisible();
 
       const title = header.locator('h1');
-      await expect(title).toHaveText('GitHub Notifications');
+      await expect(title).toHaveText('Bulk Notifications Editor');
     });
 
     test('header has dark background (GitHub style)', async ({ page }) => {
@@ -131,7 +131,7 @@ test.describe('Repository Input', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
   });
 
   test('accepts text input', async ({ page }) => {
@@ -157,7 +157,7 @@ test.describe('Repository Input', () => {
       localStorage.setItem('ghnotif_repo', 'saved/repo');
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
 
     const input = page.locator('#repo-input');
     await expect(input).toHaveValue('saved/repo');
@@ -193,7 +193,7 @@ test.describe('Sync Button', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
   });
 
   test('is clickable', async ({ page }) => {
@@ -246,7 +246,7 @@ test.describe('Auth Status', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
 
     const authStatus = page.locator('#auth-status');
     await expect(authStatus).toContainText('Signed in as testuser');
@@ -262,7 +262,7 @@ test.describe('Auth Status', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
 
     const authStatus = page.locator('#auth-status');
     await expect(authStatus).toContainText('Not authenticated');
@@ -274,7 +274,7 @@ test.describe('Auth Status', () => {
       route.abort('failed');
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
 
     const authStatus = page.locator('#auth-status');
     await expect(authStatus).toContainText('Auth check failed');
@@ -296,7 +296,7 @@ test.describe('Status Bar', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
   });
 
   test('is hidden initially', async ({ page }) => {
@@ -323,7 +323,7 @@ test.describe('Responsive Layout', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
   });
 
   test('container has max-width constraint', async ({ page }) => {

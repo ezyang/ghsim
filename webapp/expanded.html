@@ -84,6 +84,12 @@
             background: rgba(255, 255, 255, 0.12);
         }
 
+        .header-links {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
         main {
             max-width: 1180px;
             margin: 32px auto;
@@ -371,7 +377,10 @@
                 <h1>Expanded Notifications</h1>
                 <p>Pull each thread into grouped comment bundles, prefetching only when updates land.</p>
             </div>
-            <a class="header-link" href="/app/">Back to bulk editor</a>
+            <div class="header-links">
+                <a class="header-link" href="/app/">All tools</a>
+                <a class="header-link" href="/app/bulk-notifications.html">Bulk editor</a>
+            </div>
         </div>
     </header>
 

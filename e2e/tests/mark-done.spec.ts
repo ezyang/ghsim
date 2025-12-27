@@ -49,7 +49,7 @@ test.describe('Mark Done', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
 
     // Sync to load notifications
@@ -436,7 +436,7 @@ test.describe('Mark Done with Node IDs', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
 
     await page.locator('#repo-input').fill('test/repo');

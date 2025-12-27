@@ -25,7 +25,7 @@ test.describe('Sync Functionality', () => {
     });
 
     // Navigate first, then clear localStorage (so it doesn't clear on reload)
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -219,7 +219,7 @@ test.describe('Pagination', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -404,7 +404,7 @@ test.describe('Error Handling', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -517,7 +517,7 @@ test.describe('Notifications Display', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 

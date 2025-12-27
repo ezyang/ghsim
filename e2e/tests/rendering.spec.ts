@@ -164,7 +164,7 @@ test.describe('Notification Rendering', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
 
     // Trigger sync
@@ -466,7 +466,7 @@ test.describe('XSS Prevention', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();

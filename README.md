@@ -26,7 +26,7 @@ uv run python -m ghsim.token myaccount --prod
 # Start the API server
 uv run python -m ghsim.api.server --account myaccount
 
-# Open debug UI
+# Open web app index
 open http://localhost:8000/app/
 ```
 
@@ -190,7 +190,7 @@ Health check with fetcher status.
 
 #### `GET /`
 
-Redirects to `/app/` (debug UI) or returns API info.
+Redirects to `/app/` (web UI index) or returns API info.
 
 ## Server Options
 
@@ -241,15 +241,12 @@ Token saved to `auth_state/myaccount.token`.
 | `--prod` | `repo`, `notifications` |
 | default | `repo`, `notifications`, `delete_repo` |
 
-## Debug UI
+## Web UI
 
 Access at `http://localhost:8000/app/` when server is running.
 
-Features:
-- Shows authenticated GitHub user at top
-- Form for testing `/notifications/html/repo/{owner}/{repo}` endpoint
-- Remembers field values in localStorage
-- Pretty-printed JSON response
+Bulk notifications editor:
+- `http://localhost:8000/app/bulk-notifications.html` for selecting and bulk-updating notifications.
 
 Expanded notifications view:
 - `http://localhost:8000/app/expanded.html` for per-thread comment bundles with REST prefetching.
@@ -311,8 +308,9 @@ ghsim/
 └── flows/                  # Test flow implementations
 
 webapp/
+├── bulk-notifications.html # Bulk notifications editor UI
 ├── expanded.html           # Expanded notifications UI
-└── index.html              # Debug UI
+└── index.html              # Web UI index
 
 tests/
 ├── fixtures/               # HTML test fixtures
