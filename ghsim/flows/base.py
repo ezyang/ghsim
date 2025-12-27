@@ -169,6 +169,7 @@ class BaseFlow(ABC):
                 print(
                     f"Please manually delete: https://github.com/{self.owner_username}/{self.repo_name}"
                 )
+                raise
 
     def create_browser_context(self, playwright) -> BrowserContext | None:
         """Create an authenticated browser context for the owner account."""

@@ -11,7 +11,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright, Page, BrowserContext
+from playwright.sync_api import sync_playwright, Page, BrowserContext, TimeoutError
 
 
 AUTH_STATE_DIR = Path("auth_state")
@@ -26,15 +26,10 @@ def is_logged_in(page: Page) -> bool:
     """Check if the user is logged into GitHub."""
     # Check for the user avatar/menu which indicates logged-in state
     # The avatar appears in the header when logged in
-    try:
-        # Look for elements that only appear when logged in
-        # The user menu button has a specific structure
-        logged_in_indicator = page.locator(
-            'button[aria-label="Open user navigation menu"]'
-        )
-        return logged_in_indicator.count() > 0
-    except Exception:
-        return False
+    # Look for elements that only appear when logged in
+    # The user menu button has a specific structure
+    logged_in_indicator = page.locator('button[aria-label="Open user navigation menu"]')
+    return logged_in_indicator.count() > 0
 
 
 def wait_for_login(page: Page, timeout_ms: int = 300000) -> bool:
@@ -60,7 +55,7 @@ def wait_for_login(page: Page, timeout_ms: int = 300000) -> bool:
             state="visible",
         )
         return True
-    except Exception as e:
+    except TimeoutError as e:
         print(f"Login wait failed: {e}")
         return False
 

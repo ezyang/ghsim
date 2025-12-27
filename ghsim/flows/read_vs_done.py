@@ -126,13 +126,6 @@ class ReadVsDoneFlow(BaseFlow):
 
             return True
 
-        except Exception as e:
-            print(f"\nError during test: {e}")
-            import traceback
-
-            traceback.print_exc()
-            return False
-
         finally:
             self.cleanup_test_repo()
 
@@ -325,15 +318,10 @@ class ReadVsDoneFlow(BaseFlow):
         }
         """
 
-        try:
-            result = self.owner_api.graphql(query)
-            print(f"GraphQL result: {json.dumps(result, indent=2)}")
-            save_response("graphql_notifications", result, "json")
-            return result
-        except Exception as e:
-            print(f"GraphQL query failed: {e}")
-            # Try alternative queries
-            return self._try_alternative_graphql_queries()
+        result = self.owner_api.graphql(query)
+        print(f"GraphQL result: {json.dumps(result, indent=2)}")
+        save_response("graphql_notifications", result, "json")
+        return result
 
     def _try_alternative_graphql_queries(self) -> dict[str, Any]:
         """Try alternative GraphQL queries to find notification data."""
@@ -355,19 +343,16 @@ class ReadVsDoneFlow(BaseFlow):
         }
         """
 
-        try:
-            result = self.owner_api.graphql(
-                query_issue,
-                {
-                    "owner": self.owner_username,
-                    "repo": self.repo_name,
-                    "number": 1,
-                },
-            )
-            print(f"Issue subscription state: {json.dumps(result, indent=2)}")
-            results["issue_subscription"] = result
-        except Exception as e:
-            print(f"Issue GraphQL query failed: {e}")
+        result = self.owner_api.graphql(
+            query_issue,
+            {
+                "owner": self.owner_username,
+                "repo": self.repo_name,
+                "number": 1,
+            },
+        )
+        print(f"Issue subscription state: {json.dumps(result, indent=2)}")
+        results["issue_subscription"] = result
 
         save_response("graphql_alternatives", results, "json")
         return results

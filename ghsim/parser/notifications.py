@@ -83,14 +83,15 @@ def _parse_notification_items(soup: BeautifulSoup) -> list[Notification]:
     # Find all notification list items
     items = soup.select("li.notifications-list-item[data-notification-id]")
 
-    for item in items:
+    for index, item in enumerate(items):
         try:
             notification = _parse_single_notification(item)
-            if notification:
-                notifications.append(notification)
-        except Exception:
-            # Skip malformed notifications
-            continue
+        except Exception as e:
+            raise ValueError(
+                f"Failed to parse notification item at index {index}"
+            ) from e
+        if notification:
+            notifications.append(notification)
 
     return notifications
 

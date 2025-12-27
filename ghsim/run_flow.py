@@ -5,21 +5,28 @@ Usage:
     python -m ghsim.run_flow <flow_name> <owner_account> <trigger_account> [options]
 
 Available flows:
-    basic       - Basic notification generation test
-    pagination  - Generate 26+ notifications to test pagination
-    read_vs_done - Test read vs done state visibility in API
+    basic             - Basic notification generation test
+    pagination        - Generate 26+ notifications to test pagination
+    read_vs_done      - Test read vs done state visibility in API
+    parser_validation - Validate HTML parser against API notifications
 """
 
 import argparse
 import sys
 
-from ghsim.flows import BasicNotificationFlow, PaginationFlow, ReadVsDoneFlow
+from ghsim.flows import (
+    BasicNotificationFlow,
+    PaginationFlow,
+    ParserValidationFlow,
+    ReadVsDoneFlow,
+)
 
 
 FLOWS = {
     "basic": BasicNotificationFlow,
     "pagination": PaginationFlow,
     "read_vs_done": ReadVsDoneFlow,
+    "parser_validation": ParserValidationFlow,
 }
 
 
@@ -29,9 +36,10 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Available flows:
-  basic        - Basic notification generation and visibility test
-  pagination   - Generate 26+ notifications to test pagination
-  read_vs_done - Test whether API can distinguish read from done notifications
+  basic             - Basic notification generation and visibility test
+  pagination        - Generate 26+ notifications to test pagination
+  read_vs_done      - Test whether API can distinguish read from done notifications
+  parser_validation - Validate HTML parser against API notifications
         """,
     )
     parser.add_argument(

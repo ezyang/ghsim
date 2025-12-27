@@ -99,12 +99,5 @@ class BasicNotificationFlow(BaseFlow):
 
             return True
 
-        except Exception as e:
-            print(f"\nError during test: {e}")
-            import traceback
-
-            traceback.print_exc()
-            return False
-
         finally:
             self.cleanup_test_repo()

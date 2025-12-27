@@ -230,14 +230,13 @@ def generate_e2e_fixtures(force: bool = False) -> None:
                 owner=owner,
                 repo=repo,
             )
-            json_content = json.dumps(
-                parsed.model_dump(mode="json"),
-                indent=2,
-                default=str,
-            )
         except Exception as e:
-            print(f"  ERROR: Failed to parse HTML: {e}")
-            continue
+            raise RuntimeError(f"Failed to parse HTML fixture {html_path}") from e
+        json_content = json.dumps(
+            parsed.model_dump(mode="json"),
+            indent=2,
+            default=str,
+        )
 
         # Check for changes
         if json_path.exists():
