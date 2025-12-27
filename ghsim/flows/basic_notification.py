@@ -8,6 +8,7 @@ from playwright.sync_api import sync_playwright
 
 from ghsim.flows.base import BaseFlow
 from ghsim.github_api import save_response, RESPONSES_DIR
+from ghsim.parser.notifications import parse_notifications_html
 
 
 class BasicNotificationFlow(BaseFlow):
@@ -70,8 +71,17 @@ class BasicNotificationFlow(BaseFlow):
                 page.screenshot(path=str(screenshot_path), full_page=True)
                 print(f"Screenshot saved to: {screenshot_path}")
 
-                # Save HTML
-                save_response("basic_notification_html", page.content(), "html")
+                # Save HTML and JSON
+                html_content = page.content()
+                save_response("basic_notification_html", html_content, "html")
+                # Parse and save JSON
+                parsed = parse_notifications_html(
+                    html=html_content,
+                    owner=self.owner_username,
+                    repo=self.repo_name,
+                    source_url=url,
+                )
+                save_response("basic_notification_json", parsed.model_dump(mode="json"), "json")
 
                 if context.browser:
                     context.browser.close()

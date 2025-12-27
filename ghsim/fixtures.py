@@ -1,25 +1,31 @@
 """
-Fixture management CLI for test HTML files.
+Fixture management CLI for test HTML and JSON files.
 
 This module provides commands to manage test fixtures:
 - list: Show available response files that can become fixtures
 - update: Copy latest responses to tests/fixtures/ with stable names
+- generate-e2e: Generate E2E JSON fixtures from HTML fixtures
 
 Usage:
     python -m ghsim.fixtures list
     python -m ghsim.fixtures update [--force]
+    python -m ghsim.fixtures generate-e2e [--force]
 """
 
 import argparse
 import difflib
+import json
 import re
 import shutil
 import sys
 from pathlib import Path
 
+from ghsim.parser.notifications import parse_notifications_html
+
 # Directories
 RESPONSES_DIR = Path("responses")
 FIXTURES_DIR = Path("tests/fixtures")
+E2E_FIXTURES_DIR = Path("e2e/fixtures")
 
 # Mapping from response file patterns to fixture names
 # Pattern -> fixture name (without extension)
@@ -30,6 +36,17 @@ FIXTURE_MAPPING = {
     r"html_before_done_\d{8}_\d{6}\.html": "notification_before_done",
     r"html_after_done_\d{8}_\d{6}\.html": "notification_after_done",
     r"notifications_html_\d{8}_\d{6}\.html": "notifications_inbox",
+}
+
+# Mapping from HTML fixtures to E2E JSON fixtures
+# HTML fixture name -> (E2E JSON fixture name, owner, repo)
+# owner/repo are used for parsing; use "fixture" as placeholder
+E2E_FIXTURE_MAPPING: dict[str, tuple[str, str, str]] = {
+    "pagination_page1.html": ("notifications_pagination_page1.json", "fixture", "repo"),
+    "pagination_page2.html": ("notifications_pagination_page2.json", "fixture", "repo"),
+    "notification_before_done.html": ("notifications_before_done.json", "fixture", "repo"),
+    "notification_after_done.html": ("notifications_after_done.json", "fixture", "repo"),
+    "notifications_inbox.html": ("notifications_inbox.json", "fixture", "repo"),
 }
 
 
@@ -177,6 +194,85 @@ def update_fixtures(force: bool = False) -> None:
     print(f"\nUpdated {len(updates)} fixture(s).")
 
 
+def generate_e2e_fixtures(force: bool = False) -> None:
+    """Generate E2E JSON fixtures from HTML fixtures."""
+    print("Generating E2E JSON fixtures from HTML fixtures")
+    print("=" * 60)
+
+    # Ensure E2E fixtures directory exists
+    E2E_FIXTURES_DIR.mkdir(parents=True, exist_ok=True)
+
+    updates: list[tuple[Path, Path, str]] = []  # (html_src, json_dst, json_content)
+
+    for html_name, (json_name, owner, repo) in E2E_FIXTURE_MAPPING.items():
+        html_path = FIXTURES_DIR / html_name
+        json_path = E2E_FIXTURES_DIR / json_name
+
+        print(f"\n{html_name} -> {json_name}:")
+
+        if not html_path.exists():
+            print(f"  SKIP: Source HTML fixture not found: {html_path}")
+            continue
+
+        # Parse HTML to get JSON
+        html_content = html_path.read_text()
+        try:
+            parsed = parse_notifications_html(
+                html=html_content,
+                owner=owner,
+                repo=repo,
+            )
+            json_content = json.dumps(
+                parsed.model_dump(mode="json"),
+                indent=2,
+                default=str,
+            )
+        except Exception as e:
+            print(f"  ERROR: Failed to parse HTML: {e}")
+            continue
+
+        # Check for changes
+        if json_path.exists():
+            existing_content = json_path.read_text()
+            if existing_content == json_content:
+                print("  (no changes)")
+                continue
+            else:
+                # Show summary of changes
+                existing_data = json.loads(existing_content)
+                new_data = json.loads(json_content)
+                old_count = len(existing_data.get("notifications", []))
+                new_count = len(new_data.get("notifications", []))
+                print(f"  Changes: {old_count} -> {new_count} notifications")
+        else:
+            parsed_data = json.loads(json_content)
+            notif_count = len(parsed_data.get("notifications", []))
+            print(f"  (new file, {notif_count} notifications)")
+
+        updates.append((html_path, json_path, json_content))
+
+    if not updates:
+        print("\n" + "-" * 60)
+        print("No updates needed.")
+        return
+
+    print("\n" + "-" * 60)
+    print(f"Files to generate: {len(updates)}")
+
+    if not force:
+        response = input("\nProceed with generation? [y/N] ")
+        if response.lower() != "y":
+            print("Aborted.")
+            return
+
+    # Perform updates
+    for html_src, json_dst, json_content in updates:
+        json_dst.write_text(json_content)
+        print(f"  Generated: {json_dst.name}")
+
+    print(f"\nGenerated {len(updates)} E2E fixture(s).")
+
+
 def main() -> int:
     """Main entry point for fixture management CLI."""
     parser = argparse.ArgumentParser(
@@ -195,12 +291,22 @@ def main() -> int:
         "--force", "-f", action="store_true", help="Skip confirmation prompt"
     )
 
+    # generate-e2e command
+    generate_parser = subparsers.add_parser(
+        "generate-e2e", help="Generate E2E JSON fixtures from HTML fixtures"
+    )
+    generate_parser.add_argument(
+        "--force", "-f", action="store_true", help="Skip confirmation prompt"
+    )
+
     args = parser.parse_args()
 
     if args.command == "list":
         list_responses()
     elif args.command == "update":
         update_fixtures(force=args.force)
+    elif args.command == "generate-e2e":
+        generate_e2e_fixtures(force=args.force)
     else:
         parser.print_help()
         return 1

@@ -901,7 +901,7 @@
             render();
 
             const successfulIds = [];
-            const failedIds = [];
+            const failedResults = []; // Store {id, error} for detailed reporting
             let rateLimitDelay = 0;
 
             for (let i = 0; i < selectedIds.length; i++) {
@@ -916,28 +916,27 @@
                 }
 
                 try {
-                    const response = await fetch(`/github/rest/notifications/threads/${notifId}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({}),
-                    });
+                    const result = await markNotificationDone(notifId);
 
-                    if (response.status === 429) {
-                        // Rate limited - get retry-after header
-                        const retryAfter = response.headers.get('Retry-After');
-                        rateLimitDelay = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000;
+                    if (result.rateLimited) {
+                        // Rate limited - wait and retry
+                        rateLimitDelay = result.retryAfter || 60000;
                         showStatus(`Rate limited. Waiting ${Math.ceil(rateLimitDelay / 1000)}s...`, 'info');
                         i--; // Retry this item
                         continue;
                     }
 
-                    if (response.ok || response.status === 205) {
+                    if (result.success) {
                         successfulIds.push(notifId);
                     } else {
-                        failedIds.push(notifId);
+                        const errorDetail = result.error || `HTTP ${result.status || 'unknown'}`;
+                        console.error(`[MarkDone] Failed for ${notifId}:`, errorDetail);
+                        failedResults.push({ id: notifId, error: errorDetail });
                     }
                 } catch (e) {
-                    failedIds.push(notifId);
+                    const errorDetail = e.message || String(e);
+                    console.error(`[MarkDone] Exception for ${notifId}:`, e);
+                    failedResults.push({ id: notifId, error: errorDetail });
                 }
 
                 // Small delay between requests to avoid rate limiting
@@ -963,13 +962,19 @@
             elements.markDoneBtn.disabled = false;
             elements.selectAllCheckbox.disabled = false;
 
-            // Show result message
-            if (failedIds.length === 0) {
+            // Show result message with details
+            if (failedResults.length === 0) {
                 showStatus(`Marked ${successfulIds.length} notification${successfulIds.length !== 1 ? 's' : ''} as done`, 'success');
             } else if (successfulIds.length === 0) {
-                showStatus(`Failed to mark notifications as done`, 'error');
+                // All failed - show first error for context
+                const firstError = failedResults[0].error;
+                showStatus(`Failed to mark notifications: ${firstError}`, 'error');
+                console.error('[MarkDone] All failed. Errors:', failedResults);
             } else {
-                showStatus(`Marked ${successfulIds.length} done, ${failedIds.length} failed`, 'error');
+                // Partial failure
+                const firstError = failedResults[0].error;
+                showStatus(`Marked ${successfulIds.length} done, ${failedResults.length} failed: ${firstError}`, 'error');
+                console.error('[MarkDone] Partial failure. Errors:', failedResults);
             }
 
             render();
@@ -978,6 +983,106 @@
         // Sleep helper for delays
         function sleep(ms) {
             return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        // Check if ID is a GitHub node ID (starts with prefix like NT_, PR_, etc.)
+        function isNodeId(id) {
+            return typeof id === 'string' && /^[A-Z]+_/.test(id);
+        }
+
+        // Mark a single notification as done using the appropriate API
+        async function markNotificationDone(notifId) {
+            console.log(`[MarkDone] Attempting to mark notification: ${notifId}`);
+            console.log(`[MarkDone] ID type: ${isNodeId(notifId) ? 'Node ID (GraphQL)' : 'Numeric ID (REST)'}`);
+
+            if (isNodeId(notifId)) {
+                // Use GraphQL API for node IDs
+                const query = `
+                    mutation MarkNotificationDone($input: MarkNotificationsAsDoneInput!) {
+                        markNotificationsAsDone(input: $input) {
+                            success
+                        }
+                    }
+                `;
+
+                const requestBody = {
+                    query,
+                    variables: {
+                        input: { id: notifId }
+                    }
+                };
+
+                console.log(`[MarkDone] GraphQL request:`, JSON.stringify(requestBody, null, 2));
+
+                const response = await fetch('/github/graphql', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody),
+                });
+
+                console.log(`[MarkDone] GraphQL response status: ${response.status} ${response.statusText}`);
+
+                // Read response body
+                const responseText = await response.text();
+                console.log(`[MarkDone] GraphQL response body:`, responseText);
+
+                if (!response.ok) {
+                    const error = `GraphQL HTTP error: ${response.status} ${response.statusText}`;
+                    console.error(`[MarkDone] ${error}`);
+                    return { success: false, error, status: response.status, responseBody: responseText };
+                }
+
+                let data;
+                try {
+                    data = JSON.parse(responseText);
+                } catch (parseError) {
+                    const error = `Failed to parse GraphQL response: ${parseError.message}`;
+                    console.error(`[MarkDone] ${error}`);
+                    return { success: false, error, responseBody: responseText };
+                }
+
+                // Check for GraphQL errors
+                if (data.errors && data.errors.length > 0) {
+                    const error = `GraphQL error: ${data.errors.map(e => e.message).join(', ')}`;
+                    console.error(`[MarkDone] ${error}`);
+                    return { success: false, error, errors: data.errors };
+                }
+
+                console.log(`[MarkDone] GraphQL success for ${notifId}`);
+                return { success: true };
+            } else {
+                // Use REST API for numeric thread IDs
+                const url = `/github/rest/notifications/threads/${notifId}`;
+                console.log(`[MarkDone] REST request: PATCH ${url}`);
+
+                const response = await fetch(url, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({}),
+                });
+
+                console.log(`[MarkDone] REST response status: ${response.status} ${response.statusText}`);
+
+                if (response.status === 429) {
+                    const retryAfter = response.headers.get('Retry-After');
+                    console.warn(`[MarkDone] Rate limited, retry after: ${retryAfter}s`);
+                    return {
+                        success: false,
+                        rateLimited: true,
+                        retryAfter: retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000
+                    };
+                }
+
+                if (!response.ok && response.status !== 205) {
+                    const responseText = await response.text();
+                    const error = `REST error: ${response.status} ${response.statusText}`;
+                    console.error(`[MarkDone] ${error}`, responseText);
+                    return { success: false, error, status: response.status, responseBody: responseText };
+                }
+
+                console.log(`[MarkDone] REST success for ${notifId}`);
+                return { success: true };
+            }
         }
 
         // Handle keyboard shortcuts

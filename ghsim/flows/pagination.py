@@ -13,6 +13,7 @@ from playwright.sync_api import sync_playwright
 
 from ghsim.flows.base import BaseFlow
 from ghsim.github_api import save_response, RESPONSES_DIR
+from ghsim.parser.notifications import parse_notifications_html
 
 
 class PaginationFlow(BaseFlow):
@@ -193,8 +194,23 @@ class PaginationFlow(BaseFlow):
         print(f"  Screenshot: {screenshot_path}")
 
         # Save HTML
-        html_path = save_response(f"pagination_page{page_num}", page.content(), "html")
+        html_content = page.content()
+        html_path = save_response(f"pagination_page{page_num}", html_content, "html")
         print(f"  HTML: {html_path}")
+
+        # Parse HTML and save JSON
+        parsed = parse_notifications_html(
+            html=html_content,
+            owner=self.owner_username,
+            repo=self.repo_name,
+            source_url=url,
+        )
+        json_path = save_response(
+            f"pagination_page{page_num}",
+            parsed.model_dump(mode="json"),
+            "json",
+        )
+        print(f"  JSON: {json_path}")
 
         # Extract pagination cursors
         result = {

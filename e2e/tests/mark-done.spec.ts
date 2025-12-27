@@ -1,6 +1,15 @@
 import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
 
+// Fixture with realistic GitHub node IDs (like real notifications have)
+const fixtureWithNodeIds = {
+  ...mixedFixture,
+  notifications: mixedFixture.notifications.map((n, i) => ({
+    ...n,
+    id: `NT_kwDNNPyxMjE0NjQyMDU0MjA6MTM1Ng${i}`, // Realistic node ID format
+  })),
+};
+
 /**
  * Phase 7: Mark Done Tests
  *
@@ -246,7 +255,8 @@ test.describe('Mark Done', () => {
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
       await page.locator('#mark-done-btn').click();
 
-      await expect(page.locator('#status-bar')).toContainText('Failed to mark notifications as done');
+      await expect(page.locator('#status-bar')).toContainText('Failed to mark notifications');
+      await expect(page.locator('#status-bar')).toContainText('500');
       await expect(page.locator('#status-bar')).toHaveClass(/error/);
     });
 
@@ -387,5 +397,136 @@ test.describe('Mark Done', () => {
       // Should have made 2 calls (initial + retry)
       expect(callCount).toBe(2);
     });
+  });
+});
+
+/**
+ * Tests for Mark Done with realistic GitHub node IDs.
+ * GitHub's HTML notifications use node IDs (NT_...) which require GraphQL API.
+ */
+test.describe('Mark Done with Node IDs', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/github/rest/user', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ login: 'testuser' }),
+      });
+    });
+
+    // Use fixture with realistic node IDs
+    await page.route('**/notifications/html/repo/**', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(fixtureWithNodeIds),
+      });
+    });
+
+    await page.goto('/');
+    await page.evaluate(() => localStorage.clear());
+
+    await page.locator('#repo-input').fill('test/repo');
+    await page.locator('#sync-btn').click();
+    await expect(page.locator('#status-bar')).toContainText('Synced 5 notifications');
+  });
+
+  test('uses GraphQL API for node IDs', async ({ page }) => {
+    let graphqlCalled = false;
+    let graphqlBody: { query?: string; variables?: { input?: { id?: string } } } | null = null;
+
+    // Mock GraphQL endpoint
+    await page.route('**/github/graphql', async (route) => {
+      graphqlCalled = true;
+      graphqlBody = route.request().postDataJSON();
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            markNotificationsAsDone: {
+              success: true,
+            },
+          },
+        }),
+      });
+    });
+
+    // Select first item (which has a node ID)
+    const firstItem = page.locator('.notification-item').first();
+    await firstItem.locator('.notification-checkbox').click();
+
+    // Click Mark Done
+    await page.locator('#mark-done-btn').click();
+
+    // Should succeed
+    await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+
+    // Should have used GraphQL
+    expect(graphqlCalled).toBe(true);
+    expect(graphqlBody?.query).toContain('markNotificationsAsDone');
+  });
+
+  test('GraphQL request includes correct node ID', async ({ page }) => {
+    let capturedId: string | undefined;
+
+    await page.route('**/github/graphql', async (route) => {
+      const body = route.request().postDataJSON();
+      capturedId = body?.variables?.input?.id;
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { markNotificationsAsDone: { success: true } },
+        }),
+      });
+    });
+
+    await page.locator('.notification-item').first().locator('.notification-checkbox').click();
+    await page.locator('#mark-done-btn').click();
+
+    await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+
+    // ID should start with NT_ (node ID format)
+    expect(capturedId).toMatch(/^NT_/);
+  });
+
+  test('handles GraphQL errors gracefully', async ({ page }) => {
+    await page.route('**/github/graphql', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          errors: [{ message: 'Not found' }],
+        }),
+      });
+    });
+
+    await page.locator('.notification-item').first().locator('.notification-checkbox').click();
+    await page.locator('#mark-done-btn').click();
+
+    await expect(page.locator('#status-bar')).toContainText('Failed to mark notifications');
+    await expect(page.locator('#status-bar')).toContainText('Not found');
+    await expect(page.locator('#status-bar')).toHaveClass(/error/);
+  });
+
+  test('removes notification after successful GraphQL mark done', async ({ page }) => {
+    await page.route('**/github/graphql', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: { markNotificationsAsDone: { success: true } },
+        }),
+      });
+    });
+
+    await expect(page.locator('.notification-item')).toHaveCount(5);
+
+    await page.locator('.notification-item').first().locator('.notification-checkbox').click();
+    await page.locator('#mark-done-btn').click();
+
+    await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+    await expect(page.locator('.notification-item')).toHaveCount(4);
   });
 });

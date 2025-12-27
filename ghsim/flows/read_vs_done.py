@@ -19,6 +19,7 @@ from playwright.sync_api import sync_playwright, Page
 
 from ghsim.flows.base import BaseFlow
 from ghsim.github_api import save_response, RESPONSES_DIR
+from ghsim.parser.notifications import parse_notifications_html
 
 
 class ReadVsDoneFlow(BaseFlow):
@@ -238,7 +239,16 @@ class ReadVsDoneFlow(BaseFlow):
         RESPONSES_DIR.mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(RESPONSES_DIR / "before_done.png"))
         print("Screenshot saved: before_done.png")
-        save_response("html_before_done", page.content(), "html")
+        html_content = page.content()
+        save_response("html_before_done", html_content, "html")
+        # Parse and save JSON
+        parsed = parse_notifications_html(
+            html=html_content,
+            owner=self.owner_username,
+            repo=self.repo_name,
+            source_url=url,
+        )
+        save_response("json_before_done", parsed.model_dump(mode="json"), "json")
 
         # Find the notification row and select it, then click Done
         # The notification has a checkbox we need to click first
@@ -287,7 +297,16 @@ class ReadVsDoneFlow(BaseFlow):
         # Screenshot after
         page.screenshot(path=str(RESPONSES_DIR / "after_done.png"))
         print("Screenshot saved: after_done.png")
-        save_response("html_after_done", page.content(), "html")
+        html_after = page.content()
+        save_response("html_after_done", html_after, "html")
+        # Parse and save JSON
+        parsed_after = parse_notifications_html(
+            html=html_after,
+            owner=self.owner_username,
+            repo=self.repo_name,
+            source_url=url,
+        )
+        save_response("json_after_done", parsed_after.model_dump(mode="json"), "json")
 
     def _check_graphql_notifications(self) -> dict[str, Any]:
         """Try to query notifications via GraphQL."""
