@@ -2,7 +2,8 @@
 Server CLI for the HTML notifications API.
 
 Usage:
-    python -m ghinbox.api.server --account your_account
+    python -m ghinbox.api.server              # Uses default account (auto-setup on first run)
+    python -m ghinbox.api.server --account X  # Uses specific account X
 
 This starts the API server with live GitHub fetching enabled,
 using the specified account's authenticated session.
@@ -13,7 +14,68 @@ import sys
 
 import uvicorn
 
-from ghinbox.auth import has_valid_auth
+from ghinbox.auth import (
+    has_valid_auth,
+    login_interactive,
+    load_username,
+    DEFAULT_ACCOUNT,
+)
+from ghinbox.token import has_token, provision_token
+
+
+def setup_default_account(headed: bool = False) -> tuple[bool, str | None]:
+    """
+    Set up the default account with authentication and token.
+
+    Args:
+        headed: Whether to run browser in headed mode for token provisioning
+
+    Returns:
+        Tuple of (success, username)
+    """
+    print("\n" + "=" * 60)
+    print("First-time setup: Setting up default GitHub account")
+    print("=" * 60 + "\n")
+
+    # Step 1: Interactive login (always headed for login)
+    if not has_valid_auth(DEFAULT_ACCOUNT):
+        print("Step 1: GitHub Login")
+        print("-" * 40)
+        result = login_interactive(DEFAULT_ACCOUNT, save_username_flag=True)
+        if isinstance(result, tuple):
+            success, username = result
+        else:
+            success = result
+            username = load_username(DEFAULT_ACCOUNT)
+
+        if not success:
+            print("ERROR: Login failed")
+            return False, None
+    else:
+        username = load_username(DEFAULT_ACCOUNT)
+        print(f"Auth already configured for: {username or 'default'}")
+
+    # Step 2: Token provisioning
+    if not has_token(DEFAULT_ACCOUNT):
+        print("\nStep 2: GitHub API Token")
+        print("-" * 40)
+        token = provision_token(
+            DEFAULT_ACCOUNT,
+            force=False,
+            headless=not headed,
+            prod=True,  # Use reduced scopes for default account
+        )
+        if not token:
+            print("ERROR: Token provisioning failed")
+            return False, username
+    else:
+        print("Token already configured")
+
+    print("\n" + "=" * 60)
+    print("Setup complete!")
+    print("=" * 60 + "\n")
+
+    return True, username
 
 
 def main() -> int:
@@ -25,8 +87,7 @@ def main() -> int:
         "--account",
         "-a",
         help="ghinbox account name for live GitHub fetching. "
-        "Must have valid auth (run: python -m ghinbox.auth ACCOUNT). "
-        "Required unless --test is specified.",
+        "If not specified, uses the default account (auto-setup on first run).",
     )
     parser.add_argument(
         "--host",
@@ -65,18 +126,46 @@ def main() -> int:
         print("Starting server in TEST MODE (no live fetching)")
         # Don't set GHSIM_ACCOUNT - app will run without fetcher
     else:
-        # Require account in non-test mode
-        if not args.account:
-            parser.error("--account is required (or use --test for testing)")
+        # Determine which account to use
+        account = args.account or DEFAULT_ACCOUNT
 
-        # Validate account
-        if not has_valid_auth(args.account):
-            print(f"ERROR: No valid auth for account '{args.account}'")
-            print(f"Run: python -m ghinbox.auth {args.account}")
-            return 1
+        # Check if account needs setup
+        if not has_valid_auth(account):
+            if account == DEFAULT_ACCOUNT:
+                # Auto-setup for default account
+                success, username = setup_default_account(headed=args.headed)
+                if not success:
+                    return 1
+            else:
+                # Explicit account must be set up manually
+                print(f"ERROR: No valid auth for account '{account}'")
+                print(f"Run: python -m ghinbox.auth {account}")
+                return 1
+        else:
+            # Account exists, check for token
+            if not has_token(account):
+                if account == DEFAULT_ACCOUNT:
+                    # Auto-provision token for default account
+                    print("Token not found, provisioning...")
+                    token = provision_token(
+                        account, force=False, headless=not args.headed, prod=True
+                    )
+                    if not token:
+                        print("ERROR: Token provisioning failed")
+                        return 1
+                else:
+                    print(f"WARNING: No token for account '{account}'")
+                    print(f"Run: python -m ghinbox.token {account}")
+                    print("API proxy features will not work without a token.\n")
 
-        print(f"Starting server with account: {args.account}")
-        os.environ["GHSIM_ACCOUNT"] = args.account
+        # Show account info
+        username = load_username(account)
+        if username:
+            print(f"Starting server with account: {account} (GitHub: {username})")
+        else:
+            print(f"Starting server with account: {account}")
+
+        os.environ["GHSIM_ACCOUNT"] = account
         os.environ["GHSIM_HEADLESS"] = "0" if args.headed else "1"
 
     print(f"Server: http://{args.host}:{args.port}")

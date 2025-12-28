@@ -16,10 +16,34 @@ from playwright.sync_api import sync_playwright, Page, BrowserContext
 
 AUTH_STATE_DIR = Path("auth_state")
 
+# Special account name for the default/primary user
+DEFAULT_ACCOUNT = "default"
+
 
 def get_auth_state_path(account: str) -> Path:
     """Get the path to the auth state file for a given account."""
     return AUTH_STATE_DIR / f"{account}.json"
+
+
+def get_username_path(account: str) -> Path:
+    """Get the path to the username file for a given account."""
+    return AUTH_STATE_DIR / f"{account}.username"
+
+
+def save_username(account: str, username: str) -> Path:
+    """Save the username for an account."""
+    AUTH_STATE_DIR.mkdir(parents=True, exist_ok=True)
+    username_path = get_username_path(account)
+    username_path.write_text(username)
+    return username_path
+
+
+def load_username(account: str) -> str | None:
+    """Load the username for an account if it exists."""
+    username_path = get_username_path(account)
+    if username_path.exists():
+        return username_path.read_text().strip()
+    return None
 
 
 def is_logged_in(page: Page) -> bool:
@@ -70,6 +94,55 @@ def save_auth_state(context: BrowserContext, account: str) -> Path:
     return auth_path
 
 
+def extract_username(page: Page) -> str | None:
+    """
+    Extract the GitHub username from an authenticated page.
+
+    Args:
+        page: A Playwright page that is logged into GitHub
+
+    Returns:
+        The username or None if it couldn't be extracted
+    """
+    # Method 1: Look for the username in the user menu button
+    user_button = page.locator('button[aria-label="Open user navigation menu"]')
+    if user_button.count() > 0:
+        # The username is often in the image alt or nearby elements
+        img = user_button.locator("img")
+        if img.count() > 0:
+            alt = img.get_attribute("alt")
+            if alt and alt.startswith("@"):
+                return alt[1:]  # Remove the @ prefix
+
+    # Method 2: Navigate to profile and extract from URL
+    page.goto("https://github.com/settings/profile")
+    page.wait_for_load_state("domcontentloaded")
+
+    # The URL might have the username, or we can extract from the page
+    # Look for the username input field
+    username_input = page.locator('input[id="user_profile_name"]')
+    if username_input.count() > 0:
+        # Actually we need the login, not the display name
+        pass
+
+    # Method 3: Get it from the meta tag or page content
+    # GitHub has a meta tag with the user login
+    meta = page.locator('meta[name="user-login"]')
+    if meta.count() > 0:
+        content = meta.get_attribute("content")
+        if content:
+            return content
+
+    # Method 4: Parse from the profile URL link
+    profile_link = page.locator('a[href^="/"]:has-text("Your profile")')
+    if profile_link.count() > 0:
+        href = profile_link.get_attribute("href")
+        if href and href.startswith("/"):
+            return href[1:]  # Remove the leading /
+
+    return None
+
+
 def load_auth_state(account: str) -> dict | None:
     """
     Load the auth state for an account if it exists.
@@ -93,22 +166,28 @@ def has_valid_auth(account: str) -> bool:
     return get_auth_state_path(account).exists()
 
 
-def login_interactive(account: str, force: bool = False) -> bool:
+def login_interactive(
+    account: str, force: bool = False, save_username_flag: bool = False
+) -> bool | tuple[bool, str | None]:
     """
     Perform interactive login for a GitHub account.
 
     Args:
         account: The account identifier (e.g., 'account1', 'account2')
         force: If True, force re-login even if auth state exists
+        save_username_flag: If True, extract and save the username after login
 
     Returns:
-        True if login was successful, False otherwise
+        If save_username_flag is False: True if login was successful, False otherwise
+        If save_username_flag is True: Tuple of (success, username)
     """
     auth_path = get_auth_state_path(account)
 
     if auth_path.exists() and not force:
         print(f"Auth state already exists for '{account}' at {auth_path}")
         print("Use --force to re-login")
+        if save_username_flag:
+            return True, load_username(account)
         return True
 
     print(f"\n{'=' * 60}")
@@ -141,6 +220,8 @@ def login_interactive(account: str, force: bool = False) -> bool:
             if not wait_for_login(page):
                 print("Login failed or timed out.")
                 browser.close()
+                if save_username_flag:
+                    return False, None
                 return False
 
         print("Login successful!")
@@ -148,12 +229,22 @@ def login_interactive(account: str, force: bool = False) -> bool:
         # Navigate to home to ensure we have full session
         page.goto("https://github.com")
 
+        # Extract username if requested
+        username = None
+        if save_username_flag:
+            username = extract_username(page)
+            if username:
+                save_username(account, username)
+                print(f"Detected GitHub username: {username}")
+
         # Save the authentication state
         saved_path = save_auth_state(context, account)
         print(f"\nAuth state saved to: {saved_path}")
 
         browser.close()
 
+    if save_username_flag:
+        return True, username
     return True
 
 
