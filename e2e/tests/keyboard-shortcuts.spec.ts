@@ -56,7 +56,7 @@ test.describe('Keyboard Shortcuts', () => {
 
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
-    await expect(page.locator('#status-bar')).toContainText('Synced 5 notifications');
+    await expect(page.locator('.notification-item')).toHaveCount(5);
   });
 
   test('j/k moves the active selection', async ({ page }) => {

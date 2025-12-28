@@ -220,6 +220,16 @@ test.describe('Notification Rendering', () => {
       const mergedItem = page.locator('[data-id="pr-merged"]');
       await expect(mergedItem).toHaveAttribute('data-state', 'merged');
     });
+
+    test('notification shows unsubscribe buttons on top and bottom', async ({ page }) => {
+      const totalNotifications = testNotifications.notifications.length;
+      await expect(page.locator('.notification-unsubscribe-btn')).toHaveCount(
+        totalNotifications * 2
+      );
+      await expect(page.locator('.notification-unsubscribe-btn-bottom')).toHaveCount(
+        totalNotifications
+      );
+    });
   });
 
   test.describe('Icons', () => {

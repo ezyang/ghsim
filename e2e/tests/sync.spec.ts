@@ -678,6 +678,24 @@ test.describe('Sync Functionality', () => {
     await expect(page.locator('#status-bar')).toBeVisible();
   });
 
+  test('sync shows detailed request status while loading', async ({ page }) => {
+    await page.route('**/notifications/html/repo/test/repo', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(emptyResponse),
+      });
+    });
+
+    await page.locator('#repo-input').fill('test/repo');
+    await page.locator('#sync-btn').click();
+
+    await expect(page.locator('#status-bar')).toContainText('requesting page 1');
+    await expect(page.locator('#status-bar')).toHaveClass(/flash/);
+    await expect(page.locator('#status-bar')).toContainText('Synced');
+  });
+
   test('sync hides empty state when notifications exist', async ({ page }) => {
     await page.route('**/notifications/html/repo/test/repo', (route) => {
       route.fulfill({

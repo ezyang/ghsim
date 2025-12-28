@@ -151,7 +151,9 @@ test.describe('Triage queues', () => {
     await page.locator('#filter-approved').click();
     await expect(page.locator('[data-id="thread-pr-2"]')).toBeVisible();
 
-    await page.locator('[data-id="thread-pr-2"] .notification-unsubscribe-btn').click();
+    await page
+      .locator('[data-id="thread-pr-2"] .notification-actions-inline .notification-unsubscribe-btn')
+      .click();
     await expect(page.locator('#status-bar')).toContainText(
       'Unsubscribed and marked 1 notification as done'
     );
