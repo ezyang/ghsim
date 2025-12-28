@@ -7,9 +7,6 @@ __pycache__
 .aider*
 .specstory
 .claude
-# Claude tends to generate these, don't check them in
-test_*.py
-debug_*.py
 
 # Playwright credential storage (contains sensitive auth state)
 auth_state/
