@@ -133,6 +133,26 @@ test.describe('Mark Done', () => {
     });
   });
 
+  test.describe('Inline Mark Done', () => {
+    test('inline button marks a single notification as done', async ({ page }) => {
+      const apiCalls: string[] = [];
+
+      await page.route('**/github/rest/notifications/threads/**', (route) => {
+        apiCalls.push(route.request().url());
+        route.fulfill({ status: 204 });
+      });
+
+      await expect(page.locator('.notification-item')).toHaveCount(5);
+
+      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('.notification-item')).toHaveCount(4);
+      expect(apiCalls.length).toBe(1);
+      expect(apiCalls[0]).toContain('notif-1');
+    });
+  });
+
   test.describe('Progress Indicator', () => {
     test('progress bar appears during Mark Done operation', async ({ page }) => {
       // Mock with delay to see progress

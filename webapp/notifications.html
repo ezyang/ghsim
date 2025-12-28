@@ -126,6 +126,12 @@
             color: var(--color-fg-muted);
         }
 
+        .comment-cache-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
         .rate-limit-box {
             margin-top: 12px;
             padding: 8px 12px;
@@ -225,6 +231,12 @@
         .btn:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        .btn-small {
+            padding: 3px 10px;
+            font-size: 12px;
+            line-height: 18px;
         }
 
         .btn-primary {
@@ -559,6 +571,41 @@
             flex-shrink: 0;
         }
 
+        .notification-actions-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .notification-done-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 6px;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--color-fg-muted);
+            cursor: pointer;
+        }
+
+        .notification-done-btn:hover {
+            background-color: var(--color-btn-hover-bg);
+            border-color: var(--color-border-default);
+            color: var(--color-fg-default);
+        }
+
+        .notification-done-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .notification-done-btn svg {
+            width: 16px;
+            height: 16px;
+        }
+
         /* Filter tabs */
         .filter-tabs {
             display: flex;
@@ -749,7 +796,12 @@
                     <input type="checkbox" id="comment-expand-toggle">
                     Show unread comments
                 </label>
-                <span id="comment-cache-status" class="comment-cache-status"></span>
+                <div class="comment-cache-actions">
+                    <span id="comment-cache-status" class="comment-cache-status"></span>
+                    <button id="clear-comment-cache-btn" class="btn btn-small" type="button">
+                        Clear cache
+                    </button>
+                </div>
             </div>
             <div id="status-bar" class="status-bar"></div>
             <div id="rate-limit-box" class="rate-limit-box">Rate limit: unknown</div>
@@ -873,6 +925,7 @@
             commentPrefetchToggle: document.getElementById('comment-prefetch-toggle'),
             commentExpandToggle: document.getElementById('comment-expand-toggle'),
             commentCacheStatus: document.getElementById('comment-cache-status'),
+            clearCommentCacheBtn: document.getElementById('clear-comment-cache-btn'),
             rateLimitBox: document.getElementById('rate-limit-box'),
             loading: document.getElementById('loading'),
             emptyState: document.getElementById('empty-state'),
@@ -980,6 +1033,7 @@
             elements.commentExpandToggle.addEventListener('change', (event) => {
                 setCommentExpandEnabled(event.target.checked);
             });
+            elements.clearCommentCacheBtn.addEventListener('click', handleClearCommentCache);
 
             // Select all checkbox handler
             elements.selectAllCheckbox.addEventListener('change', handleSelectAll);
@@ -1093,11 +1147,25 @@
 
         function updateCommentCacheStatus() {
             const cachedCount = Object.keys(state.commentCache.threads || {}).length;
+            elements.clearCommentCacheBtn.disabled = cachedCount === 0;
             if (!state.commentPrefetchEnabled) {
                 elements.commentCacheStatus.textContent = 'Comments: off';
                 return;
             }
             elements.commentCacheStatus.textContent = `Comments cached: ${cachedCount}`;
+        }
+
+        function handleClearCommentCache() {
+            state.commentCache = { version: 1, threads: {} };
+            state.commentQueue = [];
+            localStorage.removeItem(COMMENT_CACHE_KEY);
+            if (state.commentPrefetchEnabled && state.notifications.length > 0) {
+                scheduleCommentPrefetch(state.notifications);
+                showStatus('Comment cache cleared. Refetching comments...', 'info');
+            } else {
+                showStatus('Comment cache cleared.', 'success');
+            }
+            render();
         }
 
         function formatRateLimit(rateLimit, error) {
@@ -1240,13 +1308,21 @@
                     ? await fetchRestNotificationsMap(missingKeys)
                     : new Map();
             const mergedNotifications = notifications.map((notif) => {
+                const lastReadAtMissing = !notif.last_read_at;
                 const cached = cachedLastReadAt.get(getNotificationKey(notif));
-                if (cached && !notif.last_read_at) {
-                    return { ...notif, last_read_at: cached };
+                if (cached && lastReadAtMissing) {
+                    return { ...notif, last_read_at: cached, last_read_at_missing: true };
                 }
                 const rest = restMap.get(getNotificationMatchKey(notif));
-                if (rest && rest.last_read_at && !notif.last_read_at) {
-                    return { ...notif, last_read_at: rest.last_read_at };
+                if (rest && rest.last_read_at && lastReadAtMissing) {
+                    return {
+                        ...notif,
+                        last_read_at: rest.last_read_at,
+                        last_read_at_missing: true,
+                    };
+                }
+                if (lastReadAtMissing) {
+                    return { ...notif, last_read_at_missing: true };
                 }
                 return notif;
             });
@@ -1279,14 +1355,33 @@
             state.commentQueueRunning = false;
         }
 
+        function toIssueComment(issue) {
+            if (!issue) {
+                return null;
+            }
+            return {
+                id: issue.id || `issue-${issue.number || 'unknown'}`,
+                user: issue.user,
+                body: issue.body ?? '',
+                created_at: issue.created_at,
+                updated_at: issue.updated_at,
+                isIssue: true,
+            };
+        }
+
         async function prefetchNotificationComments(notification) {
             const threadId = getNotificationKey(notification);
             const cached = state.commentCache.threads[threadId];
+            const shouldLoadAllComments = Boolean(
+                notification.last_read_at_missing || !notification.last_read_at
+            );
             if (
                 cached &&
                 cached.notificationUpdatedAt === notification.updated_at &&
-                cached.lastReadAt === (notification.last_read_at || null) &&
-                isCommentCacheFresh(cached)
+                isCommentCacheFresh(cached) &&
+                ((shouldLoadAllComments && cached.allComments) ||
+                    (!shouldLoadAllComments &&
+                        cached.lastReadAt === (notification.last_read_at || null)))
             ) {
                 return;
             }
@@ -1307,31 +1402,56 @@
                 if (!repo) {
                     throw new Error('Missing repository input.');
                 }
-                const lastReadAt = notification.last_read_at || cached?.lastReadAt || null;
-                if (!lastReadAt) {
-                    state.commentCache.threads[threadId] = {
-                        notificationUpdatedAt: notification.updated_at,
-                        comments: [],
-                        error: 'Missing last_read_at; enable refresh via REST.',
-                        fetchedAt: new Date().toISOString(),
-                    };
-                    return;
+                let lastReadAt = null;
+                let allComments = false;
+                let comments = [];
+                if (shouldLoadAllComments) {
+                    allComments = true;
+                    const issueUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}`;
+                    let issue = null;
+                    try {
+                        issue = await fetchJson(issueUrl);
+                    } catch (error) {
+                        issue = null;
+                    }
+                    const commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
+                    const commentPayload = await fetchJson(commentUrl);
+                    const issueComment = toIssueComment(issue);
+                    if (issueComment) {
+                        comments.push(issueComment);
+                    }
+                    if (Array.isArray(commentPayload)) {
+                        comments = comments.concat(commentPayload);
+                    }
+                } else {
+                    lastReadAt = notification.last_read_at || cached?.lastReadAt || null;
+                    if (!lastReadAt) {
+                        state.commentCache.threads[threadId] = {
+                            notificationUpdatedAt: notification.updated_at,
+                            comments: [],
+                            error: 'Missing last_read_at; unable to load unread comments.',
+                            fetchedAt: new Date().toISOString(),
+                        };
+                        return;
+                    }
+                    let commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
+                    commentUrl += `?since=${encodeURIComponent(lastReadAt)}`;
+                    comments = await fetchJson(commentUrl);
                 }
-                let commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
-                commentUrl += `?since=${encodeURIComponent(lastReadAt)}`;
-                const comments = await fetchJson(commentUrl);
 
                 state.commentCache.threads[threadId] = {
                     notificationUpdatedAt: notification.updated_at,
                     lastReadAt,
                     unread: notification.unread,
                     comments,
+                    allComments,
                     fetchedAt: new Date().toISOString(),
                 };
             } catch (error) {
                 state.commentCache.threads[threadId] = {
                     notificationUpdatedAt: notification.updated_at,
                     comments: [],
+                    allComments: shouldLoadAllComments,
                     error: error.message || String(error),
                     fetchedAt: new Date().toISOString(),
                 };
@@ -1375,7 +1495,8 @@
             }
             const comments = cached.comments || [];
             if (comments.length === 0) {
-                return '<li class="comment-item">No unread comments found.</li>';
+                const label = cached.allComments ? 'No comments found.' : 'No unread comments found.';
+                return `<li class="comment-item">${label}</li>`;
             }
             return comments
                 .map((comment) => {
@@ -1721,6 +1842,46 @@
             return { success: true };
         }
 
+        // Handle inline Mark Done button click for a single notification
+        async function handleInlineMarkDone(notifId, button) {
+            if (state.markingInProgress) return;
+
+            button.disabled = true;
+
+            try {
+                const result = await markNotificationDone(notifId);
+
+                if (result.rateLimited) {
+                    showStatus('Rate limited. Please try again shortly.', 'info');
+                    button.disabled = false;
+                    return;
+                }
+
+                if (!result.success) {
+                    const errorDetail = result.error || `HTTP ${result.status || 'unknown'}`;
+                    showStatus(`Failed to mark notification: ${errorDetail}`, 'error');
+                    button.disabled = false;
+                    return;
+                }
+
+                state.notifications = state.notifications.filter(
+                    n => n.id !== notifId
+                );
+                state.selected.delete(notifId);
+                localStorage.setItem('ghnotif_notifications', JSON.stringify(state.notifications));
+
+                showStatus('Marked 1 notification as done', 'success');
+            } catch (e) {
+                const errorDetail = e.message || String(e);
+                showStatus(`Failed to mark notification: ${errorDetail}`, 'error');
+                button.disabled = false;
+                return;
+            }
+
+            await refreshRateLimit();
+            render();
+        }
+
         // Handle keyboard shortcuts
         function handleKeyDown(e) {
             // Don't handle shortcuts when typing in inputs
@@ -1915,6 +2076,7 @@
             discussion: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1.75 1h8.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 10.25 10H7.061l-2.574 2.573A1.458 1.458 0 0 1 2 11.543V10h-.25A1.75 1.75 0 0 1 0 8.25v-5.5C0 1.784.784 1 1.75 1ZM1.5 2.75v5.5c0 .138.112.25.25.25h1a.75.75 0 0 1 .75.75v2.19l2.72-2.72a.749.749 0 0 1 .53-.22h3.5a.25.25 0 0 0 .25-.25v-5.5a.25.25 0 0 0-.25-.25h-8.5a.25.25 0 0 0-.25.25Zm13 2a.25.25 0 0 0-.25-.25h-.5a.75.75 0 0 1 0-1.5h.5c.966 0 1.75.784 1.75 1.75v5.5A1.75 1.75 0 0 1 14.25 12H14v1.543a1.458 1.458 0 0 1-2.487 1.03L9.22 12.28a.749.749 0 0 1 .326-1.275.749.749 0 0 1 .734.215l2.22 2.22v-2.19a.75.75 0 0 1 .75-.75h1a.25.25 0 0 0 .25-.25Z"></path></svg>`,
             commit: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M11.93 8.5a4.002 4.002 0 0 1-7.86 0H.75a.75.75 0 0 1 0-1.5h3.32a4.002 4.002 0 0 1 7.86 0h3.32a.75.75 0 0 1 0 1.5Zm-1.43-.75a2.5 2.5 0 1 0-5 0 2.5 2.5 0 0 0 5 0Z"></path></svg>`,
             release: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M1 7.775V2.75C1 1.784 1.784 1 2.75 1h5.025c.464 0 .91.184 1.238.513l6.25 6.25a1.75 1.75 0 0 1 0 2.474l-5.026 5.026a1.75 1.75 0 0 1-2.474 0l-6.25-6.25A1.752 1.752 0 0 1 1 7.775Zm1.5 0c0 .066.026.13.073.177l6.25 6.25a.25.25 0 0 0 .354 0l5.025-5.025a.25.25 0 0 0 0-.354l-6.25-6.25a.25.25 0 0 0-.177-.073H2.75a.25.25 0 0 0-.25.25ZM6 5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z"></path></svg>`,
+            check: `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z"></path></svg>`,
         };
 
         // Get icon for notification type and state
@@ -2119,6 +2281,16 @@
                     const commentList = commentItems
                         ? `<ul class="comment-list">${commentItems}</ul>`
                         : '';
+                    const doneButton = `
+                        <button
+                            type="button"
+                            class="notification-done-btn"
+                            aria-label="Mark notification as done"
+                            ${state.markingInProgress ? 'disabled' : ''}
+                        >
+                            ${icons.check}
+                        </button>
+                    `;
 
                     // Actors HTML
                     let actorsHtml = '';
@@ -2154,9 +2326,12 @@
                             ${commentList}
                         </div>
                         ${actorsHtml}
-                        <time class="notification-time" datetime="${notif.updated_at}" title="${new Date(notif.updated_at).toLocaleString()}">
-                            ${relativeTime}
-                        </time>
+                        <div class="notification-actions-inline">
+                            <time class="notification-time" datetime="${notif.updated_at}" title="${new Date(notif.updated_at).toLocaleString()}">
+                                ${relativeTime}
+                            </time>
+                            ${doneButton}
+                        </div>
                     `;
 
                     // Add checkbox click handler
@@ -2164,6 +2339,12 @@
                     checkbox.addEventListener('click', (e) => {
                         e.stopPropagation();
                         handleNotificationCheckbox(notif.id, e);
+                    });
+
+                    const doneBtn = li.querySelector('.notification-done-btn');
+                    doneBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleInlineMarkDone(notif.id, doneBtn);
                     });
 
                     elements.notificationsList.appendChild(li);
