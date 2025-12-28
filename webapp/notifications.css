@@ -30,8 +30,6 @@
             --color-btn-hover-bg: #f3f4f6;
             --color-btn-primary-bg: #1f883d;
             --color-btn-primary-hover-bg: #1a7f37;
-            --comment-body-max-height: 180px;
-            --comment-body-fade-height: 32px;
         }
 
         /* Header */
@@ -152,25 +150,6 @@
             accent-color: var(--color-accent-fg);
         }
 
-        .comment-body-toggle-btn {
-            margin-top: 6px;
-            padding: 2px 6px;
-            font-size: 11px;
-            border-radius: 999px;
-            border: 1px solid var(--color-border-muted);
-            background: var(--color-bg-subtle);
-            color: var(--color-fg-muted);
-            cursor: pointer;
-        }
-
-        .comment-body-toggle-btn:hover {
-            background: var(--color-btn-hover-bg);
-        }
-
-        .comment-body-toggle-btn.is-hidden {
-            display: none;
-        }
-
         .comment-hide {
             display: inline-flex;
             align-items: center;
@@ -232,27 +211,6 @@
 
         .comment-body pre code {
             word-break: normal;
-        }
-
-        .comment-body.collapsed {
-            max-height: var(--comment-body-max-height);
-            overflow: hidden;
-            position: relative;
-        }
-
-        .comment-body.collapsed::after {
-            content: '';
-            position: absolute;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            height: var(--comment-body-fade-height);
-            background: linear-gradient(
-                to bottom,
-                rgba(255, 255, 255, 0),
-                var(--color-bg-default)
-            );
-            pointer-events: none;
         }
 
         /* Form elements */
@@ -351,21 +309,6 @@
             background-color: #ffebe9;
             border: 1px solid #ff8182;
             color: var(--color-danger-fg);
-        }
-
-        .status-bar.flash {
-            animation: status-flash 0.6s ease-out;
-        }
-
-        @keyframes status-flash {
-            0% {
-                transform: translateY(-2px);
-                box-shadow: 0 0 0 0 rgba(9, 105, 218, 0.25);
-            }
-            100% {
-                transform: translateY(0);
-                box-shadow: 0 0 0 12px rgba(9, 105, 218, 0);
-            }
         }
 
         /* Notifications list */

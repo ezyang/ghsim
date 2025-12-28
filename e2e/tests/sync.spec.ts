@@ -692,7 +692,6 @@ test.describe('Sync Functionality', () => {
     await page.locator('#sync-btn').click();
 
     await expect(page.locator('#status-bar')).toContainText('requesting page 1');
-    await expect(page.locator('#status-bar')).toHaveClass(/flash/);
     await expect(page.locator('#status-bar')).toContainText('Synced');
   });
 
