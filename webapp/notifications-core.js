@@ -2,6 +2,7 @@
         const LAST_SYNCED_REPO_KEY = 'ghnotif_last_synced_repo';
         const VIEW_KEY = 'ghnotif_view';
         const VIEW_FILTERS_KEY = 'ghnotif_view_filters';
+        const AUTH_TOKEN_KEY = 'ghnotif_authenticity_token';
 
         // Default view filters for each view
         const DEFAULT_VIEW_FILTERS = {
@@ -81,6 +82,14 @@
             );
         }
 
+        function persistAuthenticityToken(token) {
+            if (token) {
+                localStorage.setItem(AUTH_TOKEN_KEY, token);
+                return;
+            }
+            localStorage.removeItem(AUTH_TOKEN_KEY);
+        }
+
         // loadCommentCache, saveCommentCache, isCommentCacheFresh are in notifications-comments.js
 
         // Initialize app
@@ -102,6 +111,10 @@
                 }
             }
             state.lastSyncedRepo = localStorage.getItem(LAST_SYNCED_REPO_KEY);
+            const savedAuthToken = localStorage.getItem(AUTH_TOKEN_KEY);
+            if (savedAuthToken) {
+                state.authenticity_token = savedAuthToken;
+            }
 
             // Load saved view from localStorage
             const savedView = localStorage.getItem(VIEW_KEY);
