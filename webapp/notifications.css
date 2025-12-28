@@ -472,6 +472,16 @@
             padding-top: 4px;
         }
 
+        .notification-item:has(.comment-list) .notification-actions-inline {
+            top: 6px;
+        }
+
+        .notification-item:has(.comment-list) .notification-checkbox,
+        .notification-item:has(.comment-list) .notification-icon,
+        .notification-item:has(.comment-list) .notification-actors {
+            top: 6px;
+        }
+
         /* Match hover/selection background for sticky header */
         .notification-item:hover:has(.comment-list) .notification-header,
         .notification-item:hover:has(.comment-list) .notification-checkbox,

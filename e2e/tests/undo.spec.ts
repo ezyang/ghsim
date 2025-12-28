@@ -222,4 +222,41 @@ test.describe('Undo', () => {
       await expect(page.locator('#status-bar')).toContainText('Undo successful');
     });
   });
+
+  test.describe('Undo Error Handling', () => {
+    test('undo reports action errors and preserves the undo stack', async ({ page }) => {
+      let undoCalls = 0;
+      await page.route('**/notifications/html/action', (route) => {
+        undoCalls += 1;
+        if (undoCalls === 1) {
+          route.fulfill({
+            status: 503,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              detail: 'No fetcher configured. Start server with --account to enable actions.',
+            }),
+          });
+          return;
+        }
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok' }),
+        });
+      });
+
+      const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
+      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+      await markDoneResponse;
+      await expect(page.locator('.notification-item')).toHaveCount(2);
+
+      await page.keyboard.press('u');
+      await expect(page.locator('#status-bar')).toContainText('Undo failed: No fetcher configured');
+      await expect(page.locator('.notification-item')).toHaveCount(2);
+
+      await page.keyboard.press('u');
+      await expect(page.locator('#status-bar')).toContainText('Undo successful');
+      await expect(page.locator('.notification-item')).toHaveCount(3);
+    });
+  });
 });

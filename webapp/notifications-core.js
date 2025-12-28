@@ -300,18 +300,25 @@
             });
         }
 
+        function isMyPr(notification) {
+            if (notification.subject.type !== 'PullRequest') {
+                return false;
+            }
+            const reason = String(notification.reason || '').toLowerCase();
+            return reason === 'author';
+        }
+
         // Check if notification matches the current view
         function matchesView(notification) {
             if (state.view === 'issues') {
                 return notification.subject.type === 'Issue';
             }
             if (state.view === 'my-prs') {
-                return notification.subject.type === 'PullRequest' &&
-                    notification.actors?.[0]?.login === state.currentUserLogin;
+                return isMyPr(notification);
             }
             if (state.view === 'others-prs') {
                 return notification.subject.type === 'PullRequest' &&
-                    notification.actors?.[0]?.login !== state.currentUserLogin;
+                    !isMyPr(notification);
             }
             return true;
         }
@@ -373,7 +380,7 @@
                 if (notif.subject.type === 'Issue') {
                     issues++;
                 } else if (notif.subject.type === 'PullRequest') {
-                    if (notif.actors?.[0]?.login === state.currentUserLogin) {
+                    if (isMyPr(notif)) {
                         myPrs++;
                     } else {
                         othersPrs++;

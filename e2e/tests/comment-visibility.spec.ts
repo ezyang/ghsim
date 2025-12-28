@@ -201,6 +201,40 @@ test.describe('Comment visibility', () => {
     });
     expect(top).toBe('0px');
   });
+
+  test('inline actions align with the sticky title row', async ({ page }) => {
+    await page.evaluate(() => {
+      const list = document.querySelector('.comment-list');
+      const item = list?.querySelector('.comment-item');
+      if (!list || !item) {
+        return;
+      }
+      for (let i = 0; i < 12; i += 1) {
+        list.appendChild(item.cloneNode(true));
+      }
+    });
+
+    await page.locator('.comment-item').nth(10).scrollIntoViewIfNeeded();
+
+    const positions = await page.evaluate(() => {
+      const header = document.querySelector('.notification-header');
+      const title = document.querySelector('.notification-title');
+      const actions = document.querySelector('.notification-actions-inline');
+      if (!header || !title || !actions) {
+        return null;
+      }
+      return {
+        headerTop: Math.round(header.getBoundingClientRect().top),
+        titleTop: Math.round(title.getBoundingClientRect().top),
+        actionsTop: Math.round(actions.getBoundingClientRect().top),
+      };
+    });
+
+    expect(positions).not.toBeNull();
+    expect(positions?.headerTop).toBeLessThanOrEqual(2);
+    expect(Math.abs((positions?.actionsTop ?? 0) - (positions?.titleTop ?? 0)))
+      .toBeLessThanOrEqual(1);
+  });
 });
 
 test.describe('Own comment filtering', () => {
