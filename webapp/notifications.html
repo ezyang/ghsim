@@ -1405,6 +1405,27 @@
             };
         }
 
+        async function fetchAllIssueComments(repo, issueNumber) {
+            const issueUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}`;
+            let issue = null;
+            try {
+                issue = await fetchJson(issueUrl);
+            } catch (error) {
+                issue = null;
+            }
+            const commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
+            const commentPayload = await fetchJson(commentUrl);
+            const comments = [];
+            const issueComment = toIssueComment(issue);
+            if (issueComment) {
+                comments.push(issueComment);
+            }
+            if (Array.isArray(commentPayload)) {
+                comments.push(...commentPayload);
+            }
+            return comments;
+        }
+
         async function prefetchNotificationComments(notification) {
             const threadId = getNotificationKey(notification);
             const cached = state.commentCache.threads[threadId];
@@ -1443,36 +1464,17 @@
                 let comments = [];
                 if (shouldLoadAllComments) {
                     allComments = true;
-                    const issueUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}`;
-                    let issue = null;
-                    try {
-                        issue = await fetchJson(issueUrl);
-                    } catch (error) {
-                        issue = null;
-                    }
-                    const commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
-                    const commentPayload = await fetchJson(commentUrl);
-                    const issueComment = toIssueComment(issue);
-                    if (issueComment) {
-                        comments.push(issueComment);
-                    }
-                    if (Array.isArray(commentPayload)) {
-                        comments = comments.concat(commentPayload);
-                    }
+                    comments = await fetchAllIssueComments(repo, issueNumber);
                 } else {
                     lastReadAt = notification.last_read_at || cached?.lastReadAt || null;
                     if (!lastReadAt) {
-                        state.commentCache.threads[threadId] = {
-                            notificationUpdatedAt: notification.updated_at,
-                            comments: [],
-                            error: 'Missing last_read_at; unable to load unread comments.',
-                            fetchedAt: new Date().toISOString(),
-                        };
-                        return;
+                        allComments = true;
+                        comments = await fetchAllIssueComments(repo, issueNumber);
+                    } else {
+                        let commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
+                        commentUrl += `?since=${encodeURIComponent(lastReadAt)}`;
+                        comments = await fetchJson(commentUrl);
                     }
-                    let commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
-                    commentUrl += `?since=${encodeURIComponent(lastReadAt)}`;
-                    comments = await fetchJson(commentUrl);
                 }
 
                 state.commentCache.threads[threadId] = {
@@ -1507,7 +1509,7 @@
             }
             const count = cached.comments ? cached.comments.length : 0;
             if (count === 0) {
-                return { label: 'Comments: none', className: 'pending' };
+                return { label: 'Uninteresting (0)', className: 'uninteresting' };
             }
             if (isNotificationUninteresting(notification)) {
                 return { label: `Uninteresting (${count})`, className: 'uninteresting' };
@@ -1568,7 +1570,7 @@
             }
             const comments = cached.comments || [];
             if (comments.length === 0) {
-                return false;
+                return true;
             }
             return comments.every(isUninterestingComment);
         }
