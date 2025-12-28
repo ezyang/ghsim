@@ -8,7 +8,7 @@
 - There are no nested AGENTS.md files, this is the only agents file
 - Use `webapp/notifications.html` as the default UI file to edit; do not add or modify other notification UI files unless explicitly requested.
 - Use "ruff check" to check lint, "ruff format" to autoformat files and
-  "pyrefly" to typecheck.
+  "pyrefly check ." to typecheck.
 - When writing the PR description, include the original user request VERBATIM.
 - Tests:
   - Unit tests: `uv run pytest`

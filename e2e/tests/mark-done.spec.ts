@@ -183,9 +183,29 @@ test.describe('Mark Done', () => {
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
 
       await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('.notification-item.tombstone')).toHaveCount(1);
+      await expect(page.locator('[data-id="notif-1"]')).toHaveClass(/tombstone/);
+      await expect(page.locator('[data-id="notif-1"]')).toBeHidden();
       expect(apiCalls.length).toBe(1);
       expect(apiCalls[0]).toContain('notif-1');
+    });
+
+    test('bottom done button tombstones without collapsing the list', async ({ page }) => {
+      await page.route('**/github/rest/notifications/threads/**', (route) => {
+        route.fulfill({ status: 204 });
+      });
+
+      await page.locator('#comment-expand-toggle').check();
+
+      await expect(page.locator('.notification-done-btn-bottom').first()).toBeVisible();
+
+      await page.locator('[data-id="notif-1"] .notification-done-btn-bottom').click();
+
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('[data-id="notif-1"]')).toHaveClass(/tombstone/);
+      await expect(page.locator('[data-id="notif-1"]')).toBeHidden();
     });
   });
 
@@ -248,7 +268,7 @@ test.describe('Mark Done', () => {
   });
 
   test.describe('Removing Marked Notifications', () => {
-    test('successfully marked notifications are removed from list', async ({ page }) => {
+    test('successfully marked notifications are tombstoned in the list', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
         route.fulfill({ status: 204 });
       });
@@ -262,9 +282,10 @@ test.describe('Mark Done', () => {
 
       await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
 
-      // Should now have 4 notifications
-      await expect(page.locator('.notification-item')).toHaveCount(4);
-      await expect(page.locator('[data-id="notif-1"]')).not.toBeAttached();
+      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('.notification-item.tombstone')).toHaveCount(1);
+      await expect(page.locator('.notification-item:not(.tombstone)')).toHaveCount(4);
+      await expect(page.locator('[data-id="notif-1"]')).toHaveClass(/tombstone/);
     });
 
     test('notification count updates after marking done', async ({ page }) => {
@@ -363,7 +384,7 @@ test.describe('Mark Done', () => {
       await expect(page.locator('#status-bar')).toContainText('1 failed');
     });
 
-    test('successful items removed even when some fail', async ({ page }) => {
+    test('successful items are tombstoned even when some fail', async ({ page }) => {
       let callCount = 0;
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
@@ -381,8 +402,9 @@ test.describe('Mark Done', () => {
 
       await expect(page.locator('#status-bar')).toContainText('failed');
 
-      // First item should be removed, second should remain
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('[data-id="notif-1"]')).toHaveClass(/tombstone/);
+      await expect(page.locator('[data-id="notif-2"]')).not.toHaveClass(/tombstone/);
     });
   });
 
@@ -553,7 +575,7 @@ test.describe('Mark Done with Node IDs', () => {
     await expect(page.locator('#status-bar')).toHaveClass(/error/);
   });
 
-  test('removes notification after successful REST API mark done with node ID', async ({ page }) => {
+  test('tombstones notification after successful REST API mark done with node ID', async ({ page }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
       route.fulfill({ status: 204 });
     });
@@ -564,6 +586,7 @@ test.describe('Mark Done with Node IDs', () => {
     await page.locator('#mark-done-btn').click();
 
     await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
-    await expect(page.locator('.notification-item')).toHaveCount(4);
+    await expect(page.locator('.notification-item')).toHaveCount(5);
+    await expect(page.locator('.notification-item.tombstone')).toHaveCount(1);
   });
 });

@@ -151,4 +151,34 @@ test.describe('Triage queues', () => {
     await expect(page.locator('[data-id="thread-pr-2"]')).not.toBeAttached();
     expect(unsubscribeCalled).toBe(true);
   });
+
+  test('approved queue shows bottom unsubscribe when comments are expanded', async ({
+    page,
+  }) => {
+    let unsubscribeCalled = false;
+    await page.route(
+      '**/github/rest/notifications/threads/thread-pr-2/subscription',
+      (route) => {
+        unsubscribeCalled = route.request().method() === 'DELETE';
+        route.fulfill({ status: 204, body: '' });
+      }
+    );
+
+    await page.locator('#comment-expand-toggle').check();
+    await page.locator('#filter-approved').click();
+    await expect(page.locator('[data-id="thread-pr-2"]')).toBeVisible();
+
+    const bottomUnsubscribeButton = page.locator(
+      '[data-id="thread-pr-2"] .notification-unsubscribe-btn-bottom'
+    );
+    await expect(bottomUnsubscribeButton).toBeVisible();
+
+    await bottomUnsubscribeButton.click();
+
+    await expect(page.locator('#status-bar')).toContainText(
+      'Unsubscribed from 1 notification'
+    );
+    await expect(page.locator('[data-id="thread-pr-2"]')).not.toBeAttached();
+    expect(unsubscribeCalled).toBe(true);
+  });
 });
