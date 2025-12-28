@@ -22,3 +22,5 @@
   - Regenerate E2E JSON fixtures: `uv run python -m ghinbox.fixtures generate-e2e --force`
 - Always run tests after making changes.
 - Always add E2E tests for new features.
+- There may be multiple coding agents running at the same time; don't worry
+  too much about unexpected changes, we are running SCM checkpoints regularly.

@@ -1029,3 +1029,4 @@
                 return null;
             }
             return { owner: parts[0], repo: parts[1] };
+        }
