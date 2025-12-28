@@ -126,6 +126,17 @@
             color: var(--color-fg-muted);
         }
 
+        .rate-limit-box {
+            margin-top: 12px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--color-border-muted);
+            background: var(--color-bg-subtle);
+            color: var(--color-fg-muted);
+            font-size: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
         .comment-expand {
             display: inline-flex;
             align-items: center;
@@ -741,6 +752,7 @@
                 <span id="comment-cache-status" class="comment-cache-status"></span>
             </div>
             <div id="status-bar" class="status-bar"></div>
+            <div id="rate-limit-box" class="rate-limit-box">Rate limit: unknown</div>
         </section>
 
         <!-- Notifications Section -->
@@ -848,6 +860,8 @@
             commentQueue: [],
             commentQueueRunning: false,
             commentCache: loadCommentCache(),
+            rateLimit: null,
+            rateLimitError: null,
         };
 
         // DOM elements
@@ -859,6 +873,7 @@
             commentPrefetchToggle: document.getElementById('comment-prefetch-toggle'),
             commentExpandToggle: document.getElementById('comment-expand-toggle'),
             commentCacheStatus: document.getElementById('comment-cache-status'),
+            rateLimitBox: document.getElementById('rate-limit-box'),
             loading: document.getElementById('loading'),
             emptyState: document.getElementById('empty-state'),
             notificationsList: document.getElementById('notifications-list'),
@@ -977,6 +992,7 @@
 
             // Check auth status
             checkAuth();
+            refreshRateLimit();
 
             // Initial render
             render();
@@ -1084,6 +1100,42 @@
             elements.commentCacheStatus.textContent = `Comments cached: ${cachedCount}`;
         }
 
+        function formatRateLimit(rateLimit, error) {
+            if (error) {
+                return `Rate limit error: ${error}`;
+            }
+            if (!rateLimit?.resources?.core) {
+                return 'Rate limit: unknown';
+            }
+            const core = rateLimit.resources.core;
+            const resetAt = core.reset
+                ? new Date(core.reset * 1000).toLocaleTimeString()
+                : 'unknown';
+            return `Rate limit: ${core.remaining}/${core.limit} reset @ ${resetAt}`;
+        }
+
+        function updateRateLimitBox() {
+            elements.rateLimitBox.textContent = formatRateLimit(
+                state.rateLimit,
+                state.rateLimitError
+            );
+        }
+
+        async function refreshRateLimit() {
+            try {
+                const response = await fetch('/github/rest/rate_limit');
+                if (!response.ok) {
+                    throw new Error(`Request failed (${response.status})`);
+                }
+                const data = await response.json();
+                state.rateLimit = data;
+                state.rateLimitError = null;
+            } catch (error) {
+                state.rateLimitError = error.message || String(error);
+            }
+            updateRateLimitBox();
+        }
+
         function getNotificationKey(notification) {
             return String(notification.id);
         }
@@ -1187,7 +1239,7 @@
                 missingKeys.size > 0
                     ? await fetchRestNotificationsMap(missingKeys)
                     : new Map();
-            return notifications.map((notif) => {
+            const mergedNotifications = notifications.map((notif) => {
                 const cached = cachedLastReadAt.get(getNotificationKey(notif));
                 if (cached && !notif.last_read_at) {
                     return { ...notif, last_read_at: cached };
@@ -1198,6 +1250,8 @@
                 }
                 return notif;
             });
+            await refreshRateLimit();
+            return mergedNotifications;
         }
 
         function scheduleCommentPrefetch(notifications) {
@@ -1221,6 +1275,7 @@
                 saveCommentCache();
                 render();
             }
+            await refreshRateLimit();
             state.commentQueueRunning = false;
         }
 
@@ -1577,6 +1632,7 @@
                 console.error('[MarkDone] Partial failure. Errors:', failedResults);
             }
 
+            await refreshRateLimit();
             render();
         }
 
@@ -1767,6 +1823,8 @@
             }
 
             const [owner, repoName] = parts;
+            const previousNotifications = state.notifications.slice();
+            const previousSelected = new Set(state.selected);
             state.loading = true;
             state.error = null;
             state.notifications = [];
@@ -1832,6 +1890,8 @@
             } catch (e) {
                 state.loading = false;
                 state.error = e.message;
+                state.notifications = previousNotifications;
+                state.selected = previousSelected;
                 showStatus(`Sync failed: ${e.message}`, 'error');
                 render();
             }

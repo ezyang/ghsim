@@ -25,6 +25,22 @@ test.describe('UI Shell', () => {
       });
     });
 
+    await page.route('**/github/rest/rate_limit', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          resources: {
+            core: {
+              remaining: 42,
+              limit: 60,
+              reset: Math.floor(Date.now() / 1000) + 3600,
+            },
+          },
+        }),
+      });
+    });
+
     await page.goto('bulk-notifications.html');
   });
 
@@ -79,6 +95,12 @@ test.describe('UI Shell', () => {
     test('has auth status display', async ({ page }) => {
       const authStatus = page.locator('#auth-status');
       await expect(authStatus).toBeVisible();
+    });
+
+    test('shows rate limit info box', async ({ page }) => {
+      const rateLimit = page.locator('#rate-limit-box');
+      await expect(rateLimit).toBeVisible();
+      await expect(rateLimit).toContainText('Rate limit: 42/60');
     });
   });
 

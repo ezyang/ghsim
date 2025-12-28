@@ -27,6 +27,15 @@ test.describe('Sync Functionality', () => {
     // Navigate first, then clear localStorage (so it doesn't clear on reload)
     await page.goto('bulk-notifications.html');
     await page.evaluate(() => localStorage.clear());
+    await page.locator('#filter-all').click();
+    const prefetchToggle = page.locator('#comment-prefetch-toggle');
+    if (await prefetchToggle.isChecked()) {
+      await prefetchToggle.uncheck();
+    }
+    const expandToggle = page.locator('#comment-expand-toggle');
+    if (await expandToggle.isChecked()) {
+      await expandToggle.uncheck();
+    }
   });
 
   test('sync button triggers API call', async ({ page }) => {
