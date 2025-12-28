@@ -130,6 +130,26 @@ test.describe('UI Shell', () => {
         .getAttribute('src');
       expect(commentsJsHref).toMatch(/notifications-comments\.js\?v=/);
 
+      const coreJsHref = await page
+        .locator('script[src*="notifications-core.js"]')
+        .getAttribute('src');
+      expect(coreJsHref).toMatch(/notifications-core\.js\?v=/);
+
+      const syncJsHref = await page
+        .locator('script[src*="notifications-sync.js"]')
+        .getAttribute('src');
+      expect(syncJsHref).toMatch(/notifications-sync\.js\?v=/);
+
+      const actionsJsHref = await page
+        .locator('script[src*="notifications-actions.js"]')
+        .getAttribute('src');
+      expect(actionsJsHref).toMatch(/notifications-actions\.js\?v=/);
+
+      const uiJsHref = await page
+        .locator('script[src*="notifications-ui.js"]')
+        .getAttribute('src');
+      expect(uiJsHref).toMatch(/notifications-ui\.js\?v=/);
+
       const appJsHref = await page
         .locator('script[src*="notifications.js"]')
         .getAttribute('src');
