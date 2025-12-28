@@ -22,7 +22,7 @@ test.describe('Smoke Tests', () => {
       errors.push(error.message);
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     // Wait for page to be fully loaded
     await page.waitForLoadState('domcontentloaded');
@@ -32,7 +32,7 @@ test.describe('Smoke Tests', () => {
   });
 
   test('page has correct title', async ({ page }) => {
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     // Check page title contains something meaningful
     const title = await page.title();
@@ -41,7 +41,7 @@ test.describe('Smoke Tests', () => {
   });
 
   test('page shows initial empty state', async ({ page }) => {
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     // The page should have some content (not blank)
     const bodyText = await page.textContent('body');
@@ -49,7 +49,7 @@ test.describe('Smoke Tests', () => {
   });
 
   test('page has main structural elements', async ({ page }) => {
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     // Check for basic HTML structure
     // These selectors will be updated as we build out the UI
@@ -87,7 +87,7 @@ test.describe('API Mocking Setup', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     // The mock is set up - actual verification will happen in later tests
     // For now, just verify the page loaded with mocking enabled
@@ -108,7 +108,7 @@ test.describe('API Mocking Setup', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
     await page.waitForLoadState('domcontentloaded');
   });
 });

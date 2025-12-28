@@ -55,7 +55,9 @@ class ProdNotificationsSnapshotFlow(BaseFlow):
         after_cursor = None
         captured = 0
 
-        with NotificationsFetcher(account=self.owner_account, headless=self.headless) as fetcher:
+        with NotificationsFetcher(
+            account=self.owner_account, headless=self.headless
+        ) as fetcher:
             for page_num in range(1, self.pages + 1):
                 result = fetcher.fetch_repo_notifications(
                     owner=owner,

@@ -28,7 +28,7 @@ test.describe('Selection', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
     await page.evaluate(() => localStorage.clear());
 
     // Sync to load notifications

@@ -246,7 +246,7 @@ Token saved to `auth_state/myaccount.token`.
 Access at `http://localhost:8000/app/` when server is running.
 
 Bulk notifications editor:
-- `http://localhost:8000/app/bulk-notifications.html` for selecting and bulk-updating notifications.
+- `http://localhost:8000/app/notifications.html` for selecting and bulk-updating notifications.
 
 Expanded notifications view:
 - `http://localhost:8000/app/expanded.html` for per-thread comment bundles with REST prefetching.
@@ -308,7 +308,7 @@ ghsim/
 └── flows/                  # Test flow implementations
 
 webapp/
-├── bulk-notifications.html # Bulk notifications editor UI
+├── notifications.html # Bulk notifications editor UI
 ├── expanded.html           # Expanded notifications UI
 └── index.html              # Web UI index
 

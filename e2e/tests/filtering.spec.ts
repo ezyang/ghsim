@@ -27,7 +27,7 @@ test.describe('Filtering', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 

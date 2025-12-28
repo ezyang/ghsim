@@ -41,7 +41,7 @@ test.describe('UI Shell', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
   });
 
   test.describe('Header', () => {
@@ -153,7 +153,7 @@ test.describe('Repository Input', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
   });
 
   test('accepts text input', async ({ page }) => {
@@ -179,7 +179,7 @@ test.describe('Repository Input', () => {
       localStorage.setItem('ghnotif_repo', 'saved/repo');
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     const input = page.locator('#repo-input');
     await expect(input).toHaveValue('saved/repo');
@@ -215,7 +215,7 @@ test.describe('Sync Button', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
   });
 
   test('is clickable', async ({ page }) => {
@@ -268,7 +268,7 @@ test.describe('Auth Status', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     const authStatus = page.locator('#auth-status');
     await expect(authStatus).toContainText('Signed in as testuser');
@@ -284,7 +284,7 @@ test.describe('Auth Status', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     const authStatus = page.locator('#auth-status');
     await expect(authStatus).toContainText('Not authenticated');
@@ -296,7 +296,7 @@ test.describe('Auth Status', () => {
       route.abort('failed');
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
 
     const authStatus = page.locator('#auth-status');
     await expect(authStatus).toContainText('Auth check failed');
@@ -318,7 +318,7 @@ test.describe('Status Bar', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
   });
 
   test('is hidden initially', async ({ page }) => {
@@ -345,7 +345,7 @@ test.describe('Responsive Layout', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
   });
 
   test('container has max-width constraint', async ({ page }) => {

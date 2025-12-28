@@ -25,7 +25,7 @@ test.describe('Sync Functionality', () => {
     });
 
     // Navigate first, then clear localStorage (so it doesn't clear on reload)
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
     await page.evaluate(() => localStorage.clear());
     await page.locator('#filter-all').click();
     const prefetchToggle = page.locator('#comment-prefetch-toggle');
@@ -228,7 +228,7 @@ test.describe('Pagination', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -413,7 +413,7 @@ test.describe('Error Handling', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 
@@ -526,7 +526,7 @@ test.describe('Notifications Display', () => {
       });
     });
 
-    await page.goto('bulk-notifications.html');
+    await page.goto('notifications.html');
     await page.evaluate(() => localStorage.clear());
   });
 
