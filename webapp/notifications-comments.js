@@ -1,6 +1,6 @@
 // notifications-comments.js
 // Comment prefetching, caching, classification, and display logic
-// This module expects the following globals from notifications.js:
+// This module expects the following globals from notifications-*.js:
 //   state, getNotificationKey, getIssueNumber, parseRepoInput,
 //   showStatus, refreshRateLimit, render, escapeHtml, renderMarkdown, fetchJson
 

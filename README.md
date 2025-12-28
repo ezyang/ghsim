@@ -248,7 +248,7 @@ The bulk notifications editor at `http://localhost:8000/app/notifications.html`
 is the primary workflow. It is built to make large notification backlogs
 tractable with a UI that GitHub itself does not provide.
 
-Highlights from the UI (see `webapp/notifications.js`):
+Highlights from the UI (see `webapp/notifications-core.js`, `webapp/notifications-sync.js`, `webapp/notifications-actions.js`, `webapp/notifications-ui.js`):
 - Quick Sync vs Full Sync, including incremental merges when the repo matches the last sync.
 - Bulk selection (including shift-click range select), plus inline and bulk Mark Done.
 - Unsubscribe + mark done in one action, with a 30-second undo window.
