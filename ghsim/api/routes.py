@@ -5,15 +5,31 @@ FastAPI route handlers for the HTML notifications API.
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel
 
 from ghsim.api.fetcher import get_fetcher, run_fetcher_call
 from ghsim.api.models import NotificationsResponse
 from ghsim.parser.notifications import parse_notifications_html
 
 router = APIRouter(prefix="/notifications/html", tags=["notifications"])
+
+
+class NotificationActionRequest(BaseModel):
+    """Request body for notification actions."""
+
+    action: Literal["unarchive", "subscribe"]
+    notification_id: str
+    authenticity_token: str
+
+
+class NotificationActionResponse(BaseModel):
+    """Response from a notification action."""
+
+    status: Literal["ok", "error"]
+    error: str | None = None
 
 
 @router.get(
@@ -196,4 +212,47 @@ async def parse_fixture(
         html=html,
         owner=owner,
         repo=repo,
+    )
+
+
+@router.post(
+    "/action",
+    response_model=NotificationActionResponse,
+    summary="Submit a notification action",
+    description="""
+    Submit a notification action (unarchive, subscribe) to GitHub.
+
+    This uses Playwright to submit an HTML form to GitHub's notification
+    endpoints, which requires a valid authenticity_token from the page.
+
+    Actions:
+    - unarchive: Move a notification back to inbox (undo "Mark as Done")
+    - subscribe: Re-subscribe to a thread (undo "Unsubscribe")
+    """,
+)
+async def submit_action(
+    request: NotificationActionRequest,
+) -> NotificationActionResponse:
+    """
+    Submit a notification action to GitHub.
+
+    Requires an active fetcher (server started with --account).
+    """
+    fetcher = get_fetcher()
+    if fetcher is None:
+        raise HTTPException(
+            status_code=503,
+            detail="No fetcher configured. Start server with --account to enable actions.",
+        )
+
+    result = await run_fetcher_call(
+        fetcher.submit_notification_action,
+        action=request.action,
+        notification_id=request.notification_id,
+        authenticity_token=request.authenticity_token,
+    )
+
+    return NotificationActionResponse(
+        status=result.status,
+        error=result.error,
     )

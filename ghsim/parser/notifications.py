@@ -59,6 +59,7 @@ def parse_notifications_html(
 
     notifications = _parse_notification_items(soup)
     pagination = _parse_pagination(soup)
+    token = _extract_authenticity_token(soup)
 
     if source_url is None:
         source_url = f"https://github.com/notifications?query=repo:{owner}/{repo}"
@@ -73,6 +74,7 @@ def parse_notifications_html(
         ),
         notifications=notifications,
         pagination=pagination,
+        authenticity_token=token,
     )
 
 
@@ -312,22 +314,20 @@ def _extract_cursor_from_href(href: str, param: str) -> str | None:
     return None
 
 
-def extract_authenticity_token(html: str) -> str | None:
+def _extract_authenticity_token(soup: BeautifulSoup) -> str | None:
     """
-    Extract an authenticity_token from the notifications page.
+    Extract an authenticity_token from a parsed notifications page.
 
     GitHub includes CSRF tokens in forms. Any token from the page can be used
     for form submissions within the same session. We look for the bulk archive
     form's token as it's reliably present.
 
     Args:
-        html: The raw HTML content of the notifications page
+        soup: Parsed BeautifulSoup object of the notifications page
 
     Returns:
         The authenticity_token value, or None if not found
     """
-    soup = BeautifulSoup(html, "lxml")
-
     # Look for the bulk archive form's token (most reliably present)
     bulk_form = soup.select_one('form[action="/notifications/beta/archive"]')
     if bulk_form:
@@ -345,3 +345,20 @@ def extract_authenticity_token(html: str) -> str | None:
             return value
 
     return None
+
+
+def extract_authenticity_token(html: str) -> str | None:
+    """
+    Extract an authenticity_token from the notifications page HTML.
+
+    This is a convenience wrapper that parses the HTML first.
+    For internal use where soup is already available, use _extract_authenticity_token.
+
+    Args:
+        html: The raw HTML content of the notifications page
+
+    Returns:
+        The authenticity_token value, or None if not found
+    """
+    soup = BeautifulSoup(html, "lxml")
+    return _extract_authenticity_token(soup)

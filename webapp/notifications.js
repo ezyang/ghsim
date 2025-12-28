@@ -26,6 +26,10 @@
             currentUserLogin: null,
             commentBodyExpanded: new Set(),
             lastSyncedRepo: null,
+            // Undo support
+            authenticity_token: null, // CSRF token for HTML form actions
+            undoStack: [], // Stack of {action, notification, timestamp}
+            undoInProgress: false,
         };
 
         // DOM elements
@@ -60,6 +64,9 @@
             progressContainer: document.getElementById('progress-container'),
             progressBarFill: document.getElementById('progress-bar-fill'),
             progressText: document.getElementById('progress-text'),
+            undoBanner: document.getElementById('undo-banner'),
+            undoBannerText: document.getElementById('undo-banner-text'),
+            undoBannerClose: document.getElementById('undo-banner-close'),
         };
 
         function persistNotifications() {

@@ -27,6 +27,14 @@ class FetchResult:
     timing: dict | None = None
 
 
+@dataclass
+class ActionResult:
+    """Result of a notification action (unarchive, subscribe, etc.)."""
+
+    status: str = "ok"
+    error: str | None = None
+
+
 class NotificationsFetcher:
     """
     Fetches notifications HTML from GitHub using Playwright.
@@ -154,6 +162,93 @@ class NotificationsFetcher:
                 error=error_text,
                 timing=timing,
             )
+
+    def submit_notification_action(
+        self,
+        action: str,
+        notification_id: str,
+        authenticity_token: str,
+    ) -> ActionResult:
+        """
+        Submit a notification action to GitHub using form POST.
+
+        Args:
+            action: The action to perform ('unarchive' or 'subscribe')
+            notification_id: The NT_... notification ID
+            authenticity_token: CSRF token from the page
+
+        Returns:
+            ActionResult indicating success or failure
+        """
+        if self._context is None:
+            self.start()
+
+        assert self._context is not None
+
+        # Map action names to GitHub endpoints
+        action_paths = {
+            "unarchive": "/notifications/beta/unarchive",
+            "subscribe": "/notifications/beta/subscribe",
+        }
+
+        if action not in action_paths:
+            return ActionResult(
+                status="error",
+                error=f"Unknown action: {action}. Valid actions: {list(action_paths.keys())}",
+            )
+
+        action_path = action_paths[action]
+        url = f"https://github.com{action_path}"
+
+        page = None
+        try:
+            page = self._context.new_page()
+
+            # We need to submit a POST request with form data.
+            # Playwright can do this by constructing a form and submitting it.
+            # Create an HTML page with a form and submit it programmatically.
+            form_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <body>
+                <form id="action-form" method="POST" action="{url}">
+                    <input type="hidden" name="authenticity_token" value="{authenticity_token}">
+                    <input type="hidden" name="notification_ids[]" value="{notification_id}">
+                </form>
+                <script>document.getElementById('action-form').submit();</script>
+            </body>
+            </html>
+            """
+
+            # Navigate to about:blank first, then set content
+            page.goto("about:blank")
+            page.set_content(form_html)
+
+            # Wait for navigation to complete (form submission)
+            # The form will redirect somewhere after submission
+            page.wait_for_load_state("networkidle", timeout=10000)
+
+            # Check if we got an error page
+            content = page.content()
+            if "error" in content.lower() and "422" in content:
+                page.close()
+                return ActionResult(
+                    status="error",
+                    error="GitHub returned 422 - token may be invalid or expired",
+                )
+
+            page.close()
+            return ActionResult(status="ok")
+
+        except Exception as e:
+            error_text = f"{type(e).__name__}: {e}"
+            print(f"[fetcher] Failed to submit action: {error_text}")
+            if page is not None:
+                try:
+                    page.close()
+                except Exception:
+                    pass
+            return ActionResult(status="error", error=error_text)
 
     def __enter__(self) -> "NotificationsFetcher":
         self.start()

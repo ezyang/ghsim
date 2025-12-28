@@ -73,3 +73,6 @@ class NotificationsResponse(BaseModel):
     repository: Repository
     notifications: list[Notification]
     pagination: Pagination
+    # CSRF token for HTML form actions (unarchive, subscribe, etc.)
+    # Any token from the page can be used for actions in the same session.
+    authenticity_token: str | None = None
