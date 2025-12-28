@@ -126,6 +126,45 @@
             color: var(--color-fg-muted);
         }
 
+        .comment-expand {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--color-fg-muted);
+        }
+
+        .comment-expand input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--color-accent-fg);
+        }
+
+        .comment-list {
+            margin-top: 10px;
+            padding-left: 0;
+            list-style: none;
+            display: grid;
+            gap: 8px;
+        }
+
+        .comment-item {
+            border: 1px solid var(--color-border-muted);
+            border-radius: 6px;
+            padding: 8px 10px;
+            background: var(--color-bg-default);
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        .comment-item .comment-meta {
+            display: flex;
+            justify-content: space-between;
+            color: var(--color-fg-muted);
+            font-size: 11px;
+            margin-bottom: 6px;
+        }
+
         /* Form elements */
         .input-group {
             display: flex;
@@ -668,7 +707,6 @@
             <h1>Bulk Notifications Editor</h1>
             <div class="header-links">
                 <a class="header-link" href="/app/">All tools</a>
-                <a class="header-link" href="/app/expanded.html">Expanded view</a>
             </div>
         </div>
     </header>
@@ -695,6 +733,10 @@
                 <label class="comment-toggle" for="comment-prefetch-toggle">
                     <input type="checkbox" id="comment-prefetch-toggle">
                     Fetch comments for uninteresting filter
+                </label>
+                <label class="comment-expand" for="comment-expand-toggle">
+                    <input type="checkbox" id="comment-expand-toggle">
+                    Show unread comments
                 </label>
                 <span id="comment-cache-status" class="comment-cache-status"></span>
             </div>
@@ -788,6 +830,7 @@
         const COMMENT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
         const COMMENT_CONCURRENCY = 4;
         const COMMENT_PREFETCH_KEY = 'ghnotif_comment_prefetch_enabled';
+        const COMMENT_EXPAND_KEY = 'ghnotif_comment_expand_enabled';
 
         // Application state
         const state = {
@@ -801,6 +844,7 @@
             markingInProgress: false, // Whether Mark Done is in progress
             markProgress: { current: 0, total: 0 }, // Progress tracking
             commentPrefetchEnabled: false,
+            commentExpandEnabled: false,
             commentQueue: [],
             commentQueueRunning: false,
             commentCache: loadCommentCache(),
@@ -813,6 +857,7 @@
             authStatus: document.getElementById('auth-status'),
             statusBar: document.getElementById('status-bar'),
             commentPrefetchToggle: document.getElementById('comment-prefetch-toggle'),
+            commentExpandToggle: document.getElementById('comment-expand-toggle'),
             commentCacheStatus: document.getElementById('comment-cache-status'),
             loading: document.getElementById('loading'),
             emptyState: document.getElementById('empty-state'),
@@ -891,6 +936,12 @@
             }
             elements.commentPrefetchToggle.checked = state.commentPrefetchEnabled;
 
+            const savedCommentExpand = localStorage.getItem(COMMENT_EXPAND_KEY);
+            if (savedCommentExpand === 'true') {
+                state.commentExpandEnabled = true;
+            }
+            elements.commentExpandToggle.checked = state.commentExpandEnabled;
+
             // Set up event listeners
             elements.syncBtn.addEventListener('click', handleSync);
             elements.repoInput.addEventListener('input', handleRepoInput);
@@ -910,6 +961,9 @@
 
             elements.commentPrefetchToggle.addEventListener('change', (event) => {
                 setCommentPrefetchEnabled(event.target.checked);
+            });
+            elements.commentExpandToggle.addEventListener('change', (event) => {
+                setCommentExpandEnabled(event.target.checked);
             });
 
             // Select all checkbox handler
@@ -958,6 +1012,12 @@
                     showStatus(`Comment prefetch setup failed: ${e.message}`, 'error');
                     render();
                 });
+        }
+
+        function setCommentExpandEnabled(enabled) {
+            state.commentExpandEnabled = enabled;
+            localStorage.setItem(COMMENT_EXPAND_KEY, String(enabled));
+            render();
         }
 
         // Set the current filter
@@ -1242,6 +1302,42 @@
                 return { label: `Uninteresting (${count})`, className: 'uninteresting' };
             }
             return { label: `Interesting (${count})`, className: 'interesting' };
+        }
+
+        function getCommentItems(notification) {
+            if (!state.commentExpandEnabled) {
+                return '';
+            }
+            if (!state.commentPrefetchEnabled) {
+                return '<li class="comment-item">Enable comment fetching to show comments.</li>';
+            }
+            const cached = state.commentCache.threads[getNotificationKey(notification)];
+            if (!cached) {
+                return '<li class="comment-item">Comments: pending...</li>';
+            }
+            if (cached.error) {
+                return `<li class="comment-item">Comments error: ${escapeHtml(cached.error)}</li>`;
+            }
+            const comments = cached.comments || [];
+            if (comments.length === 0) {
+                return '<li class="comment-item">No unread comments found.</li>';
+            }
+            return comments
+                .map((comment) => {
+                    const author = comment.user?.login || 'unknown';
+                    const timestamp = comment.updated_at || comment.created_at || '';
+                    const body = (comment.body || '').slice(0, 600);
+                    return `
+                        <li class="comment-item">
+                            <div class="comment-meta">
+                                <span>${escapeHtml(author)}</span>
+                                <span>${escapeHtml(new Date(timestamp).toLocaleString())}</span>
+                            </div>
+                            <div>${escapeHtml(body)}</div>
+                        </li>
+                    `;
+                })
+                .join('');
         }
 
         function isNotificationUninteresting(notification) {
@@ -1673,6 +1769,8 @@
             const [owner, repoName] = parts;
             state.loading = true;
             state.error = null;
+            state.notifications = [];
+            state.selected.clear();
             render();
 
             showStatus('Syncing notifications...', 'info');
@@ -1702,17 +1800,19 @@
                     const data = await response.json();
                     allNotifications.push(...data.notifications);
                     afterCursor = data.pagination.has_next ? data.pagination.after_cursor : null;
+                    state.notifications = allNotifications.slice();
+                    render();
 
                 } while (afterCursor);
 
                 // Sort by updated_at descending
-                allNotifications.sort((a, b) =>
+                const sortedNotifications = allNotifications.sort((a, b) =>
                     new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
                 );
 
-                let notifications = allNotifications;
+                let notifications = sortedNotifications;
                 if (state.commentPrefetchEnabled) {
-                    notifications = await ensureLastReadAtData(allNotifications);
+                    notifications = await ensureLastReadAtData(sortedNotifications);
                 }
 
                 state.notifications = notifications;
@@ -1893,7 +1993,7 @@
             }
 
             // Show/hide select all row
-            const showSelectAll = !state.loading && filteredNotifications.length > 0;
+            const showSelectAll = filteredNotifications.length > 0;
             elements.selectAllRow.style.display = showSelectAll ? 'flex' : 'none';
 
             // Update select all checkbox state
@@ -1931,7 +2031,7 @@
             // Render notifications list
             elements.notificationsList.innerHTML = '';
 
-            if (!state.loading && filteredNotifications.length > 0) {
+            if (filteredNotifications.length > 0) {
                 filteredNotifications.forEach(notif => {
                     const li = document.createElement('li');
                     const isSelected = state.selected.has(notif.id);
@@ -1954,6 +2054,10 @@
                             : null;
                     const commentBadge = commentStatus
                         ? `<span class="comment-tag ${commentStatus.className}">${escapeHtml(commentStatus.label)}</span>`
+                        : '';
+                    const commentItems = getCommentItems(notif);
+                    const commentList = commentItems
+                        ? `<ul class="comment-list">${commentItems}</ul>`
                         : '';
 
                     // Actors HTML
@@ -1987,6 +2091,7 @@
                                 <span class="notification-reason">${reason}</span>
                                 ${commentBadge}
                             </div>
+                            ${commentList}
                         </div>
                         ${actorsHtml}
                         <time class="notification-time" datetime="${notif.updated_at}" title="${new Date(notif.updated_at).toLocaleString()}">
