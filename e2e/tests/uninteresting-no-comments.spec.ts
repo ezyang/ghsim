@@ -100,4 +100,25 @@ test.describe('Uninteresting without new comments', () => {
     await expect(page.locator('.notification-item')).toHaveCount(1);
     await expect(page.locator('[data-id="thread-1"]')).toBeVisible();
   });
+
+  test('Mark all button appears in Uninteresting tab and marks done', async ({ page }) => {
+    const apiCalls: string[] = [];
+
+    await page.route('**/github/rest/notifications/threads/**', (route) => {
+      apiCalls.push(route.request().url());
+      route.fulfill({ status: 204 });
+    });
+
+    await page.locator('#filter-uninteresting').click();
+
+    const markDoneBtn = page.locator('#mark-done-btn');
+    await expect(markDoneBtn).toBeVisible();
+    await expect(markDoneBtn).toHaveText('Mark all as Done');
+
+    await markDoneBtn.click();
+
+    await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+    expect(apiCalls.length).toBe(1);
+    expect(apiCalls[0]).toContain('thread-1');
+  });
 });

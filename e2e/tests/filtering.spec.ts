@@ -32,15 +32,19 @@ test.describe('Filtering', () => {
   });
 
   test.describe('Filter Tabs', () => {
-    test('displays all four filter tabs', async ({ page }) => {
+    test('displays all filter tabs', async ({ page }) => {
       const allTab = page.locator('#filter-all');
       const openTab = page.locator('#filter-open');
       const closedTab = page.locator('#filter-closed');
+      const needsReviewTab = page.locator('#filter-needs-review');
+      const approvedTab = page.locator('#filter-approved');
       const uninterestingTab = page.locator('#filter-uninteresting');
 
       await expect(allTab).toBeVisible();
       await expect(openTab).toBeVisible();
       await expect(closedTab).toBeVisible();
+      await expect(needsReviewTab).toBeVisible();
+      await expect(approvedTab).toBeVisible();
       await expect(uninterestingTab).toBeVisible();
     });
 
@@ -75,16 +79,62 @@ test.describe('Filtering', () => {
     });
   });
 
+  test.describe('Type Filter', () => {
+    test('displays type filter buttons', async ({ page }) => {
+      await expect(page.locator('#type-filter-all')).toBeVisible();
+      await expect(page.locator('#type-filter-issue')).toBeVisible();
+      await expect(page.locator('#type-filter-pull')).toBeVisible();
+    });
+
+    test('filters to issues only', async ({ page }) => {
+      const input = page.locator('#repo-input');
+      await input.fill('test/repo');
+      await page.locator('#sync-btn').click();
+      await expect(page.locator('#status-bar')).toContainText('Synced 5 notifications');
+
+      await page.locator('#type-filter-issue').click();
+
+      const items = page.locator('.notification-item');
+      await expect(items).toHaveCount(3);
+      await expect(page.locator('[data-id="notif-1"]')).toBeVisible();
+      await expect(page.locator('[data-id="notif-3"]')).toBeVisible();
+      await expect(page.locator('[data-id="notif-5"]')).toBeVisible();
+      await expect(page.locator('[data-id="notif-2"]')).not.toBeAttached();
+      await expect(page.locator('[data-id="notif-4"]')).not.toBeAttached();
+    });
+
+    test('filters to pull requests only', async ({ page }) => {
+      const input = page.locator('#repo-input');
+      await input.fill('test/repo');
+      await page.locator('#sync-btn').click();
+      await expect(page.locator('#status-bar')).toContainText('Synced 5 notifications');
+
+      await page.locator('#type-filter-pull').click();
+
+      const items = page.locator('.notification-item');
+      await expect(items).toHaveCount(2);
+      await expect(page.locator('[data-id="notif-2"]')).toBeVisible();
+      await expect(page.locator('[data-id="notif-4"]')).toBeVisible();
+      await expect(page.locator('[data-id="notif-1"]')).not.toBeAttached();
+      await expect(page.locator('[data-id="notif-3"]')).not.toBeAttached();
+      await expect(page.locator('[data-id="notif-5"]')).not.toBeAttached();
+    });
+  });
+
   test.describe('Filter Counts', () => {
     test('shows 0 counts before sync', async ({ page }) => {
       const countAll = page.locator('#count-all');
       const countOpen = page.locator('#count-open');
       const countClosed = page.locator('#count-closed');
+      const countNeedsReview = page.locator('#count-needs-review');
+      const countApproved = page.locator('#count-approved');
       const countUninteresting = page.locator('#count-uninteresting');
 
       await expect(countAll).toHaveText('0');
       await expect(countOpen).toHaveText('0');
       await expect(countClosed).toHaveText('0');
+      await expect(countNeedsReview).toHaveText('0');
+      await expect(countApproved).toHaveText('0');
       await expect(countUninteresting).toHaveText('0');
     });
 
@@ -99,12 +149,16 @@ test.describe('Filtering', () => {
       const countAll = page.locator('#count-all');
       const countOpen = page.locator('#count-open');
       const countClosed = page.locator('#count-closed');
+      const countNeedsReview = page.locator('#count-needs-review');
+      const countApproved = page.locator('#count-approved');
       const countUninteresting = page.locator('#count-uninteresting');
 
       // 5 total, 2 open (open issue + open PR), 3 closed (closed issue + merged PR + not_planned issue)
       await expect(countAll).toHaveText('5');
       await expect(countOpen).toHaveText('2');
       await expect(countClosed).toHaveText('3');
+      await expect(countNeedsReview).toHaveText('0');
+      await expect(countApproved).toHaveText('0');
       await expect(countUninteresting).toHaveText('0');
     });
   });
@@ -198,12 +252,16 @@ test.describe('Filtering', () => {
       await expect(page.locator('#count-all')).toHaveText('5');
       await expect(page.locator('#count-open')).toHaveText('2');
       await expect(page.locator('#count-closed')).toHaveText('3');
+      await expect(page.locator('#count-needs-review')).toHaveText('0');
+      await expect(page.locator('#count-approved')).toHaveText('0');
 
       await page.locator('#filter-closed').click();
 
       await expect(page.locator('#count-all')).toHaveText('5');
       await expect(page.locator('#count-open')).toHaveText('2');
       await expect(page.locator('#count-closed')).toHaveText('3');
+      await expect(page.locator('#count-needs-review')).toHaveText('0');
+      await expect(page.locator('#count-approved')).toHaveText('0');
     });
   });
 
@@ -237,6 +295,25 @@ test.describe('Filtering', () => {
       // Check that Open tab is active
       await expect(page.locator('#filter-open')).toHaveClass(/active/);
       await expect(page.locator('#filter-all')).not.toHaveClass(/active/);
+    });
+
+    test('saves type filter preference to localStorage', async ({ page }) => {
+      await page.locator('#type-filter-pull').click();
+      const savedFilter = await page.evaluate(() =>
+        localStorage.getItem('ghnotif_type_filter')
+      );
+      expect(savedFilter).toBe('pull');
+    });
+
+    test('restores type filter preference on page load', async ({ page }) => {
+      await page.evaluate(() => {
+        localStorage.setItem('ghnotif_type_filter', 'issue');
+      });
+
+      await page.reload();
+
+      await expect(page.locator('#type-filter-issue')).toHaveClass(/active/);
+      await expect(page.locator('#type-filter-all')).not.toHaveClass(/active/);
     });
 
     test('restores filter and applies to loaded notifications', async ({ page }) => {

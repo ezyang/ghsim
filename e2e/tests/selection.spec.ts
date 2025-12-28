@@ -318,10 +318,7 @@ test.describe('Selection', () => {
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
 
       const item = page.locator('[data-id="notif-1"]');
-      const bgColor = await item.evaluate((el) => getComputedStyle(el).backgroundColor);
-
-      // #ddf4ff = rgb(221, 244, 255)
-      expect(bgColor).toBe('rgb(221, 244, 255)');
+      await expect(item).toHaveCSS('background-color', 'rgb(221, 244, 255)');
     });
 
     test('unselected items do not have selected background', async ({ page }) => {

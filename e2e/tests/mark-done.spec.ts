@@ -59,9 +59,27 @@ test.describe('Mark Done', () => {
   });
 
   test.describe('Mark Done Button', () => {
-    test('Mark Done button is hidden when no items selected', async ({ page }) => {
+    test('Mark Done button is hidden when no items selected in All tab', async ({ page }) => {
       const markDoneBtn = page.locator('#mark-done-btn');
       await expect(markDoneBtn).not.toBeVisible();
+    });
+
+    test('Mark all button appears in Closed tab when nothing is selected', async ({ page }) => {
+      await page.locator('#filter-closed').click();
+
+      const markDoneBtn = page.locator('#mark-done-btn');
+      await expect(markDoneBtn).toBeVisible();
+      await expect(markDoneBtn).toHaveText('Mark all as Done');
+    });
+
+    test('Mark all button switches to Mark selected in Closed tab', async ({ page }) => {
+      await page.locator('#filter-closed').click();
+
+      const markDoneBtn = page.locator('#mark-done-btn');
+      await expect(markDoneBtn).toHaveText('Mark all as Done');
+
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click();
+      await expect(markDoneBtn).toHaveText('Mark selected as Done');
     });
 
     test('Mark Done button appears when items are selected', async ({ page }) => {
@@ -115,6 +133,24 @@ test.describe('Mark Done', () => {
       expect(apiCalls.length).toBe(2);
       expect(apiCalls.some((url) => url.includes('notif-1'))).toBe(true);
       expect(apiCalls.some((url) => url.includes('notif-2'))).toBe(true);
+    });
+
+    test('Mark all in Closed tab calls API for each closed notification', async ({ page }) => {
+      const apiCalls: string[] = [];
+
+      await page.route('**/github/rest/notifications/threads/**', (route) => {
+        apiCalls.push(route.request().url());
+        route.fulfill({ status: 204 });
+      });
+
+      await page.locator('#filter-closed').click();
+      await page.locator('#mark-done-btn').click();
+
+      await expect(page.locator('#status-bar')).toContainText('Marked 3 notifications as done');
+      expect(apiCalls.length).toBe(3);
+      expect(apiCalls.some((url) => url.includes('notif-3'))).toBe(true);
+      expect(apiCalls.some((url) => url.includes('notif-4'))).toBe(true);
+      expect(apiCalls.some((url) => url.includes('notif-5'))).toBe(true);
     });
 
     test('Mark Done uses DELETE method', async ({ page }) => {
