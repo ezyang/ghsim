@@ -316,6 +316,8 @@ test.describe('Selection', () => {
   test.describe('Selection Visual Styling', () => {
     test('selected items have blue background', async ({ page }) => {
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
+      // Move mouse away to avoid hover state
+      await page.mouse.move(0, 0);
 
       const item = page.locator('[data-id="notif-1"]');
       await expect(item).toHaveCSS('background-color', 'rgb(221, 244, 255)');

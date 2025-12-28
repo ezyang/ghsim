@@ -111,8 +111,8 @@ test.describe('Keyboard Shortcuts', () => {
     await page.keyboard.press('r');
     await navigationPromise;
 
-    // After reload, the page should be back to initial state
-    await expect(page.locator('#empty-state')).toBeVisible();
+    // After reload, the page should still show notifications (repo is persisted in localStorage)
+    await expect(page.locator('.notification-item')).toHaveCount(5);
   });
 
   test('marking notification as done moves selection to next notification without scrolling', async ({
