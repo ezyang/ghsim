@@ -9,10 +9,10 @@ This flow:
 
 from __future__ import annotations
 
-from ghsim.api.fetcher import NotificationsFetcher
-from ghsim.flows.base import BaseFlow
-from ghsim.github_api import save_response, RESPONSES_DIR
-from ghsim.parser.notifications import (
+from ghinbox.api.fetcher import NotificationsFetcher
+from ghinbox.flows.base import BaseFlow
+from ghinbox.github_api import save_response, RESPONSES_DIR
+from ghinbox.parser.notifications import (
     parse_notifications_html,
     extract_authenticity_token,
 )

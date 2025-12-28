@@ -13,8 +13,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from ghsim.flows.base import BaseFlow
-from ghsim.github_api import save_response
+from ghinbox.flows.base import BaseFlow
+from ghinbox.github_api import save_response
 
 
 class CommentFetchMarksReadFlow(BaseFlow):

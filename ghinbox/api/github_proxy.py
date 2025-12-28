@@ -9,7 +9,7 @@ import os
 import httpx
 from fastapi import APIRouter, HTTPException, Request, Response
 
-from ghsim.token import load_token
+from ghinbox.token import load_token
 
 router = APIRouter(prefix="/github", tags=["github-proxy"])
 

@@ -10,9 +10,9 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
-from ghsim.api.fetcher import get_fetcher, run_fetcher_call
-from ghsim.api.models import NotificationsResponse
-from ghsim.parser.notifications import parse_notifications_html
+from ghinbox.api.fetcher import get_fetcher, run_fetcher_call
+from ghinbox.api.models import NotificationsResponse
+from ghinbox.parser.notifications import parse_notifications_html
 
 router = APIRouter(prefix="/notifications/html", tags=["notifications"])
 

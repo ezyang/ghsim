@@ -2,7 +2,7 @@
 Server CLI for the HTML notifications API.
 
 Usage:
-    python -m ghsim.api.server --account your_account
+    python -m ghinbox.api.server --account your_account
 
 This starts the API server with live GitHub fetching enabled,
 using the specified account's authenticated session.
@@ -13,7 +13,7 @@ import sys
 
 import uvicorn
 
-from ghsim.auth import has_valid_auth
+from ghinbox.auth import has_valid_auth
 
 
 def main() -> int:
@@ -24,8 +24,8 @@ def main() -> int:
     parser.add_argument(
         "--account",
         "-a",
-        help="ghsim account name for live GitHub fetching. "
-        "Must have valid auth (run: python -m ghsim.auth ACCOUNT). "
+        help="ghinbox account name for live GitHub fetching. "
+        "Must have valid auth (run: python -m ghinbox.auth ACCOUNT). "
         "Required unless --test is specified.",
     )
     parser.add_argument(
@@ -72,7 +72,7 @@ def main() -> int:
         # Validate account
         if not has_valid_auth(args.account):
             print(f"ERROR: No valid auth for account '{args.account}'")
-            print(f"Run: python -m ghsim.auth {args.account}")
+            print(f"Run: python -m ghinbox.auth {args.account}")
             return 1
 
         print(f"Starting server with account: {args.account}")
@@ -84,7 +84,7 @@ def main() -> int:
     print()
 
     uvicorn.run(
-        "ghsim.api.app:app",
+        "ghinbox.api.app:app",
         host=args.host,
         port=args.port,
         reload=not args.no_reload,

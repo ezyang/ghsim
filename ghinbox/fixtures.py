@@ -7,9 +7,9 @@ This module provides commands to manage test fixtures:
 - generate-e2e: Generate E2E JSON fixtures from HTML fixtures
 
 Usage:
-    python -m ghsim.fixtures list
-    python -m ghsim.fixtures update [--force]
-    python -m ghsim.fixtures generate-e2e [--force]
+    python -m ghinbox.fixtures list
+    python -m ghinbox.fixtures update [--force]
+    python -m ghinbox.fixtures generate-e2e [--force]
 """
 
 import argparse
@@ -20,7 +20,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from ghsim.parser.notifications import parse_notifications_html
+from ghinbox.parser.notifications import parse_notifications_html
 
 # Directories
 RESPONSES_DIR = Path("responses")

@@ -1,3 +1,3 @@
 """
-Tests for the ghsim package.
+Tests for the ghinbox package.
 """

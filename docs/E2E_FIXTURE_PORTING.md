@@ -186,13 +186,13 @@ When GitHub's HTML structure changes:
 
 ```bash
 # 1. Run a flow to capture fresh HTML
-python -m ghsim.run_flow pagination owner_account trigger_account
+python -m ghinbox.run_flow pagination owner_account trigger_account
 
 # 2. Update HTML fixtures from responses
-python -m ghsim.fixtures update --force
+python -m ghinbox.fixtures update --force
 
 # 3. Regenerate E2E JSON fixtures from HTML
-python -m ghsim.fixtures generate-e2e --force
+python -m ghinbox.fixtures generate-e2e --force
 
 # 4. Run E2E tests to verify
 npm run test:e2e

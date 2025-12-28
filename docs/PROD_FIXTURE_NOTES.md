@@ -8,7 +8,7 @@ are meant for short-lived debugging and inspection only.
 Use the read-only snapshot flow with a prod-scoped token:
 
 ```bash
-python -m ghsim.run_flow prod_notifications_snapshot ezyang ezyang \
+python -m ghinbox.run_flow prod_notifications_snapshot ezyang ezyang \
   --repo OWNER/REPO \
   --pages 2
 ```

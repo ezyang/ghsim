@@ -1,5 +1,5 @@
 {
-  "name": "ghsim-e2e",
+  "name": "ghinbox-e2e",
   "version": "1.0.0",
   "description": "E2E tests for GitHub notifications webapp",
   "scripts": {

@@ -1,5 +1,5 @@
 [project]
-name = "ghsim"
+name = "ghinbox"
 version = "0.1.0"
 description = "GitHub notification simulation and testing tool for bulk notification management"
 readme = "README.md"
@@ -38,7 +38,7 @@ dev-dependencies = [
 
 [tool.pyrefly]
 project-includes = [
-    "ghsim",
+    "ghinbox",
     "tests",
 ]
 project-excludes = [

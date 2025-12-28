@@ -11,7 +11,7 @@ from urllib.parse import parse_qs, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
-from ghsim.api.models import (
+from ghinbox.api.models import (
     Actor,
     Notification,
     NotificationsResponse,

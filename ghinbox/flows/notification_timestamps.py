@@ -15,8 +15,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from ghsim.flows.base import BaseFlow
-from ghsim.github_api import save_response
+from ghinbox.flows.base import BaseFlow
+from ghinbox.github_api import save_response
 
 
 class NotificationTimestampsFlow(BaseFlow):
@@ -91,7 +91,7 @@ class NotificationTimestampsFlow(BaseFlow):
             assert self.trigger_api is not None, (
                 "Must call validate_prerequisites first"
             )
-            comment_body = f"Follow-up comment from ghsim at {datetime.now(timezone.utc).isoformat()}"
+            comment_body = f"Follow-up comment from ghinbox at {datetime.now(timezone.utc).isoformat()}"
             self.trigger_api.create_issue_comment(
                 self.owner_username, self.repo_name, issue_number, comment_body
             )

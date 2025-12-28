@@ -13,11 +13,12 @@
 - Tests:
   - Unit tests: `uv run pytest`
   - E2E (Playwright): run from `e2e/` via `npm test` (or `npm run test:headed|test:debug|test:ui`)
-    - Playwright auto-starts the API server with `uv run python -m ghsim.api.server --test --no-reload --port 8000`
+    - Allow a longer timeout for `npm test` in automation (recommend 5 minutes / 300000 ms).
+    - Playwright auto-starts the API server with `uv run python -m ghinbox.api.server --test --no-reload --port 8000`
     - Base URL is `http://localhost:8000/app/`
   - There is no root `npm run test:e2e` script; use the `e2e/` package scripts.
 - Fixtures:
-  - Update HTML fixtures from responses (non-interactive): `uv run python -m ghsim.fixtures update --force`
-  - Regenerate E2E JSON fixtures: `uv run python -m ghsim.fixtures generate-e2e --force`
+  - Update HTML fixtures from responses (non-interactive): `uv run python -m ghinbox.fixtures update --force`
+  - Regenerate E2E JSON fixtures: `uv run python -m ghinbox.fixtures generate-e2e --force`
 - Always run tests after making changes.
 - Always add E2E tests for new features.

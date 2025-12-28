@@ -50,7 +50,7 @@ export default defineConfig({
 
   // Run local dev server before starting the tests
   webServer: {
-    command: 'cd .. && uv run python -m ghsim.api.server --test --no-reload --port 8000',
+    command: 'cd .. && uv run python -m ghinbox.api.server --test --no-reload --port 8000',
     url: 'http://localhost:8000/health',
     reuseExistingServer: !process.env.CI,
     timeout: 30000,

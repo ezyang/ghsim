@@ -1,4 +1,4 @@
-# ghsim
+# ghinbox
 
 GitHub notification simulation and testing tool with a REST API server for accessing notification data that isn't available through GitHub's official API.
 
@@ -18,13 +18,13 @@ uv sync
 uv run playwright install chromium
 
 # Authenticate (opens browser for GitHub login)
-uv run python -m ghsim.auth myaccount
+uv run python -m ghinbox.auth myaccount
 
 # Provision API token (for GitHub API proxy)
-uv run python -m ghsim.token myaccount --prod
+uv run python -m ghinbox.token myaccount --prod
 
 # Start the API server
-uv run python -m ghsim.api.server --account myaccount
+uv run python -m ghinbox.api.server --account myaccount
 
 # Open web app index
 open http://localhost:8000/app/
@@ -195,7 +195,7 @@ Redirects to `/app/` (web UI index) or returns API info.
 ## Server Options
 
 ```bash
-python -m ghsim.api.server [options]
+python -m ghinbox.api.server [options]
 
 Options:
   --account, -a NAME   Account name for live GitHub fetching (required for live mode)
@@ -211,10 +211,10 @@ Options:
 
 ```bash
 # Opens browser for manual GitHub login
-python -m ghsim.auth myaccount
+python -m ghinbox.auth myaccount
 
 # Headless mode (if session exists)
-python -m ghsim.auth myaccount --headed
+python -m ghinbox.auth myaccount --headed
 ```
 
 Session saved to `auth_state/myaccount.json`.
@@ -223,13 +223,13 @@ Session saved to `auth_state/myaccount.json`.
 
 ```bash
 # Production token (repo + notifications scopes)
-python -m ghsim.token myaccount --prod
+python -m ghinbox.token myaccount --prod
 
 # Test token (includes delete_repo scope)
-python -m ghsim.token myaccount
+python -m ghinbox.token myaccount
 
 # Show existing token
-python -m ghsim.token myaccount --show
+python -m ghinbox.token myaccount --show
 ```
 
 Token saved to `auth_state/myaccount.token`.
@@ -257,13 +257,13 @@ For testing notification behavior with two accounts:
 
 ```bash
 # Basic notification test
-python -m ghsim.run_flow basic owner_account trigger_account
+python -m ghinbox.run_flow basic owner_account trigger_account
 
 # Read vs Done state test
-python -m ghsim.run_flow read_vs_done owner_account trigger_account
+python -m ghinbox.run_flow read_vs_done owner_account trigger_account
 
 # Pagination test (creates 30 notifications)
-python -m ghsim.run_flow pagination owner_account trigger_account --num-issues 30
+python -m ghinbox.run_flow pagination owner_account trigger_account --num-issues 30
 ```
 
 Options:
@@ -277,10 +277,10 @@ Test fixtures are curated HTML files for unit testing the parser.
 
 ```bash
 # List available response files
-python -m ghsim.fixtures list
+python -m ghinbox.fixtures list
 
 # Update test fixtures from latest responses
-python -m ghsim.fixtures update
+python -m ghinbox.fixtures update
 ```
 
 Directories:
@@ -290,7 +290,7 @@ Directories:
 ## Project Structure
 
 ```
-ghsim/
+ghinbox/
 ├── api/
 │   ├── app.py              # FastAPI application
 │   ├── routes.py           # HTML notifications endpoints

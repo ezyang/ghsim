@@ -13,7 +13,7 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright, Page
 
-from ghsim.auth import (
+from ghinbox.auth import (
     has_valid_auth,
     create_authenticated_context,
 )
@@ -71,7 +71,7 @@ def provision_token(
 
     Args:
         account: The account identifier
-        token_name: Name for the token (default: ghsim-{account}-{timestamp})
+        token_name: Name for the token (default: ghinbox-{account}-{timestamp})
         force: If True, create new token even if one exists
         headless: If True, run browser in headless mode
         prod: If True, use reduced scopes (no delete_repo)
@@ -81,7 +81,7 @@ def provision_token(
     """
     if not has_valid_auth(account):
         print(f"No valid auth state for '{account}'. Run login first:")
-        print(f"  python -m ghsim.auth {account}")
+        print(f"  python -m ghinbox.auth {account}")
         return None
 
     existing_token = load_token(account)
@@ -92,7 +92,7 @@ def provision_token(
 
     if token_name is None:
         timestamp = int(time.time())
-        token_name = f"ghsim-{account}-{timestamp}"
+        token_name = f"ghinbox-{account}-{timestamp}"
 
     scopes = PROD_SCOPES if prod else TEST_SCOPES
 

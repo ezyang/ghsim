@@ -14,7 +14,7 @@ from typing import Any
 
 from playwright.sync_api import sync_playwright, BrowserContext
 
-from ghsim.auth import create_authenticated_context
+from ghinbox.auth import create_authenticated_context
 
 
 @dataclass
@@ -49,7 +49,7 @@ class NotificationsFetcher:
         Initialize the fetcher.
 
         Args:
-            account: The ghsim account name (must have valid auth state)
+            account: The ghinbox account name (must have valid auth state)
             headless: Whether to run browser in headless mode
         """
         self.account = account
@@ -70,7 +70,7 @@ class NotificationsFetcher:
         if self._context is None:
             raise RuntimeError(
                 f"Failed to create authenticated context for '{self.account}'. "
-                f"Run: python -m ghsim.auth {self.account}"
+                f"Run: python -m ghinbox.auth {self.account}"
             )
 
     def stop(self) -> None:

@@ -15,8 +15,8 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 
-from ghsim.flows.base import BaseFlow
-from ghsim.github_api import save_response
+from ghinbox.flows.base import BaseFlow
+from ghinbox.github_api import save_response
 
 
 class CommentPrefetchValidationFlow(BaseFlow):

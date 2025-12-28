@@ -9,9 +9,9 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from ghsim.api.routes import router as notifications_router
-from ghsim.api.github_proxy import router as github_proxy_router
-from ghsim.api.fetcher import (
+from ghinbox.api.routes import router as notifications_router
+from ghinbox.api.github_proxy import router as github_proxy_router
+from ghinbox.api.fetcher import (
     NotificationsFetcher,
     set_fetcher,
     get_fetcher,
@@ -92,7 +92,7 @@ async def root():
 @app.get("/health")
 async def health():
     """Health check endpoint."""
-    from ghsim.api.fetcher import get_fetcher
+    from ghinbox.api.fetcher import get_fetcher
 
     fetcher = get_fetcher()
     return {

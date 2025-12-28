@@ -6,9 +6,9 @@ import urllib.parse
 
 from playwright.sync_api import sync_playwright
 
-from ghsim.flows.base import BaseFlow
-from ghsim.github_api import save_response, RESPONSES_DIR
-from ghsim.parser.notifications import parse_notifications_html
+from ghinbox.flows.base import BaseFlow
+from ghinbox.github_api import save_response, RESPONSES_DIR
+from ghinbox.parser.notifications import parse_notifications_html
 
 
 class BasicNotificationFlow(BaseFlow):

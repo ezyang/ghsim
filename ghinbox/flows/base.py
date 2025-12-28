@@ -9,9 +9,9 @@ from typing import Any
 
 from playwright.sync_api import BrowserContext
 
-from ghsim.auth import create_authenticated_context, has_valid_auth
-from ghsim.github_api import GitHubAPI
-from ghsim.token import load_token
+from ghinbox.auth import create_authenticated_context, has_valid_auth
+from ghinbox.github_api import GitHubAPI
+from ghinbox.token import load_token
 
 
 class BaseFlow(ABC):
@@ -45,7 +45,7 @@ class BaseFlow(ABC):
         for account in [self.owner_account, self.trigger_account]:
             if not has_valid_auth(account):
                 print(
-                    f"Missing auth for '{account}'. Run: python -m ghsim.auth {account}"
+                    f"Missing auth for '{account}'. Run: python -m ghinbox.auth {account}"
                 )
                 return False
 
@@ -54,12 +54,12 @@ class BaseFlow(ABC):
 
         if not owner_token:
             print(f"Missing API token for '{self.owner_account}'.")
-            print(f"Run: python -m ghsim.token {self.owner_account}")
+            print(f"Run: python -m ghinbox.token {self.owner_account}")
             return False
 
         if not trigger_token:
             print(f"Missing API token for '{self.trigger_account}'.")
-            print(f"Run: python -m ghsim.token {self.trigger_account}")
+            print(f"Run: python -m ghinbox.token {self.trigger_account}")
             return False
 
         self.owner_api = GitHubAPI(owner_token)
@@ -77,7 +77,7 @@ class BaseFlow(ABC):
         assert self.trigger_api is not None, "Must call validate_prerequisites first"
 
         timestamp = datetime.now().strftime("%Y%m%d%H%M%S%f")
-        self.repo_name = f"ghsim-test-{timestamp}"
+        self.repo_name = f"ghinbox-test-{timestamp}"
 
         print(f"\n{'=' * 60}")
         print("Setup: Creating test repository")
@@ -139,8 +139,10 @@ class BaseFlow(ABC):
         print("Creating test issue")
         print(f"{'=' * 60}")
 
-        issue_title = f"Test issue from ghsim - {datetime.now().isoformat()}"
-        issue_body = "This is a test issue created by ghsim to trigger a notification."
+        issue_title = f"Test issue from ghinbox - {datetime.now().isoformat()}"
+        issue_body = (
+            "This is a test issue created by ghinbox to trigger a notification."
+        )
 
         issue = self.trigger_api.create_issue(
             self.owner_username, self.repo_name, issue_title, issue_body

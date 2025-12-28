@@ -102,7 +102,7 @@ class GitHubAPI:
                 "name": name,
                 "private": private,
                 "auto_init": True,  # Create with README
-                "description": "Temporary test repo for ghsim",
+                "description": "Temporary test repo for ghinbox",
             },
         )
 

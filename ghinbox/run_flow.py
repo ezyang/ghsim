@@ -2,7 +2,7 @@
 Runner for test flows.
 
 Usage:
-    python -m ghsim.run_flow <flow_name> <owner_account> <trigger_account> [options]
+    python -m ghinbox.run_flow <flow_name> <owner_account> <trigger_account> [options]
 
 Available flows:
     basic             - Basic notification generation test
@@ -18,7 +18,7 @@ Available flows:
 import argparse
 import sys
 
-from ghsim.flows import (
+from ghinbox.flows import (
     BasicNotificationFlow,
     CommentFetchMarksReadFlow,
     CommentPrefetchValidationFlow,
