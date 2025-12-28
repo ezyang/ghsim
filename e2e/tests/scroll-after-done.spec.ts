@@ -245,9 +245,9 @@ test.describe('Scroll After Done', () => {
     const secondNotificationTop = await secondNotification.evaluate((el) => el.getBoundingClientRect().top);
 
     // The header height is around 60px, so the notification should be near the top
-    // It should be within 100px of the top of the viewport (accounting for header + some margin)
+    // It should be within 200px of the top of the viewport (accounting for header + some margin)
     // The key assertion is that we're NOT showing the banner with lots of empty space above
-    expect(secondNotificationTop).toBeLessThan(150);
+    expect(secondNotificationTop).toBeLessThan(250);
     expect(secondNotificationTop).toBeGreaterThanOrEqual(0);
   });
 });

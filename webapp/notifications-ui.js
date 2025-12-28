@@ -7,13 +7,14 @@
                 return null;
             }
             const removedSet = new Set(removedIds);
+            const snapThreshold = 120;
             const shouldSnapToTop = removedIds.some(id => {
                 const removedElement = getNotificationElement(id);
                 if (!removedElement) {
                     return false;
                 }
                 const rect = removedElement.getBoundingClientRect();
-                return rect.top < 0 && rect.bottom > 0;
+                return rect.bottom > 0 && rect.top < snapThreshold;
             });
             let lastRemovedIndex = -1;
             notifications.forEach((notif, index) => {
@@ -977,7 +978,7 @@
                         </div>
                         <div class="notification-content">
                             <a href="${notif.subject.url}" class="notification-title" target="_blank" rel="noopener">
-                                ${escapeHtml(notif.subject.title)}
+                                ${renderInlineCode(notif.subject.title)}
                             </a>
                             <div class="notification-meta">
                                 ${notif.subject.number ? `<span class="notification-number">#${notif.subject.number}</span>` : ''}
@@ -1039,6 +1040,11 @@
         }
 
         let markdownConfigured = false;
+
+        function renderInlineCode(text) {
+            const escaped = escapeHtml(String(text || ''));
+            return escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
+        }
 
         function renderMarkdown(text) {
             if (!window.marked || !window.DOMPurify) {

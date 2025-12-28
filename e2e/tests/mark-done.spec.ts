@@ -324,7 +324,7 @@ test.describe('Mark Done', () => {
         route.fulfill({ status: 204 });
       });
 
-      // Verify 5 notifications initially
+      // Verify 3 notifications initially
       await expect(page.locator('.notification-item')).toHaveCount(3);
 
       // Select and mark one
@@ -342,14 +342,17 @@ test.describe('Mark Done', () => {
         route.fulfill({ status: 204 });
       });
 
-      await expect(page.locator('#count-all')).toHaveText('3');
+      const countAll = page.locator(
+        '.subfilter-tabs[data-for-view="issues"] [data-subfilter="all"] .count'
+      );
+      await expect(countAll).toHaveText('3');
 
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
       await page.locator('[data-id="notif-3"] .notification-checkbox').click();
       await page.locator('#mark-done-btn').click();
 
       await expect(page.locator('#status-bar')).toContainText('Marked 2 notifications as done');
-      await expect(page.locator('#count-all')).toHaveText('1');
+      await expect(countAll).toHaveText('1');
     });
 
     test('localStorage is updated after marking done', async ({ page }) => {

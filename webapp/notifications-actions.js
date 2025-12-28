@@ -155,6 +155,7 @@
             const notificationsToRestoreOnFailure = selectedIds
                 .map(id => notificationLookup.get(id))
                 .filter(Boolean);
+            const undoEntry = pushToUndoStack('done', notificationsToRestoreOnFailure);
 
             state.notifications = state.notifications.filter(
                 notif => !selectedIdSet.has(notif.id)
@@ -249,9 +250,7 @@
             const notificationsForUndo = successfulIds
                 .map(id => notificationLookup.get(id))
                 .filter(Boolean);
-            if (notificationsForUndo.length > 0) {
-                pushToUndoStack('done', notificationsForUndo);
-            }
+            updateUndoEntry(undoEntry, notificationsForUndo);
 
             await refreshRateLimit();
             render();
@@ -534,6 +533,9 @@
             );
             state.selected.delete(notifId);
             persistNotifications();
+            const undoEntry = notificationToRemove
+                ? pushToUndoStack('done', [notificationToRemove])
+                : null;
             render();
             requestAnimationFrame(() => {
                 restoreScrollAnchor(scrollAnchor);
@@ -552,6 +554,7 @@
                         persistNotifications();
                         render();
                     }
+                    removeUndoEntry(undoEntry);
                     button.disabled = false;
                     return;
                 }
@@ -567,14 +570,11 @@
                         persistNotifications();
                         render();
                     }
+                    removeUndoEntry(undoEntry);
                     button.disabled = false;
                     return;
                 }
 
-                // Save for undo
-                if (notificationToRemove) {
-                    pushToUndoStack('done', [notificationToRemove]);
-                }
                 showStatus('Marked 1 notification as done', 'success');
             } catch (e) {
                 const errorDetail = e.message || String(e);
@@ -587,15 +587,12 @@
                     persistNotifications();
                     render();
                 }
+                removeUndoEntry(undoEntry);
                 button.disabled = false;
                 return;
             }
 
             await refreshRateLimit();
-            render();
-            requestAnimationFrame(() => {
-                restoreScrollAnchor(scrollAnchor);
-            });
         }
 
         async function handleInlineUnsubscribe(notifId, button) {
@@ -693,17 +690,43 @@
                 ? notifications
                 : [notifications];
             if (normalizedNotifications.length === 0) {
-                return;
+                return null;
             }
-            state.undoStack.push({
+            const undoEntry = {
                 action,
                 notifications: normalizedNotifications,
                 timestamp: Date.now(),
-            });
+            };
+            state.undoStack.push(undoEntry);
             // Keep only the most recent undo (single action undo)
             if (state.undoStack.length > 1) {
                 state.undoStack = [state.undoStack[state.undoStack.length - 1]];
             }
+            return undoEntry;
+        }
+
+        function removeUndoEntry(undoEntry) {
+            if (!undoEntry) {
+                return;
+            }
+            const index = state.undoStack.indexOf(undoEntry);
+            if (index !== -1) {
+                state.undoStack.splice(index, 1);
+            }
+        }
+
+        function updateUndoEntry(undoEntry, notifications) {
+            if (!undoEntry) {
+                return;
+            }
+            const normalizedNotifications = Array.isArray(notifications)
+                ? notifications
+                : [notifications];
+            if (normalizedNotifications.length === 0) {
+                removeUndoEntry(undoEntry);
+                return;
+            }
+            undoEntry.notifications = normalizedNotifications;
         }
 
         async function handleUndo() {

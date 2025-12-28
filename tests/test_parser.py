@@ -38,6 +38,12 @@ def notifications_inbox_html() -> str:
     return (FIXTURES_DIR / "notifications_inbox.html").read_text()
 
 
+@pytest.fixture
+def notifications_inline_code_html() -> str:
+    """Load the notifications inline code fixture."""
+    return (FIXTURES_DIR / "notifications_inline_code.html").read_text()
+
+
 class TestParseNotificationsHtml:
     """Tests for the main parse_notifications_html function."""
 
@@ -116,6 +122,19 @@ class TestParseNotificationsHtml:
 
         read_notif = read_notifications[0]
         assert read_notif.unread is False
+
+    def test_preserves_inline_code_spacing(
+        self, notifications_inline_code_html: str
+    ) -> None:
+        """Ensure inline code in titles keeps backticks and spacing."""
+        result = parse_notifications_html(
+            html=notifications_inline_code_html,
+            owner="test",
+            repo="repo",
+        )
+        assert result.notifications[0].subject.title == (
+            "autograd.function with `setup_context` has a number of issues with `torch.compile`"
+        )
 
     def test_extracts_actors(self, pagination_page1_html: str) -> None:
         """Test that actor information is extracted."""

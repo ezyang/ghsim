@@ -337,10 +337,14 @@ test.describe('Polish', () => {
       // Remaining checkboxes should be enabled
       const checkboxes = page.locator('.notification-item .notification-checkbox');
       await expect(checkboxes).toHaveCount(2);
-      const enabledStates = await checkboxes.evaluateAll((nodes) =>
-        nodes.map((node) => !node.disabled)
-      );
-      expect(enabledStates.every(Boolean)).toBe(true);
+      await expect
+        .poll(async () => {
+          const enabledStates = await checkboxes.evaluateAll((nodes) =>
+            nodes.map((node) => !node.disabled)
+          );
+          return enabledStates.every(Boolean);
+        })
+        .toBe(true);
     });
   });
 });

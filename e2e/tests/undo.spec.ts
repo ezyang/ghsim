@@ -65,7 +65,10 @@ test.describe('Undo', () => {
       await expect(page.locator('.notification-item')).toHaveCount(3);
 
       // Mark as done
+      const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+      await markDoneResponse;
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Press u to undo
@@ -85,7 +88,10 @@ test.describe('Undo', () => {
     });
 
     test('u key is ignored when typing in input', async ({ page }) => {
+      const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+      await markDoneResponse;
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Focus on repo input and type 'u'
@@ -93,7 +99,7 @@ test.describe('Undo', () => {
       await page.keyboard.press('u');
 
       // Undo should NOT be triggered
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
     });
   });
 
@@ -108,10 +114,16 @@ test.describe('Undo', () => {
       });
 
       // Mark two notifications as done
+      let markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+      await markDoneResponse;
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
+      markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-3"] .notification-done-btn').click();
+      await markDoneResponse;
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
       await expect(page.locator('.notification-item')).toHaveCount(1);
 
       // Undo should only restore the second one
@@ -138,7 +150,10 @@ test.describe('Undo', () => {
       });
 
       // Mark the first notification as done
+      const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+      await markDoneResponse;
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Undo
@@ -158,7 +173,10 @@ test.describe('Undo', () => {
         });
       });
 
+      const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+      await markDoneResponse;
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Check localStorage after mark done

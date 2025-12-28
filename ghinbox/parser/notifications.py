@@ -185,7 +185,7 @@ def _extract_subject(item: Tag) -> Subject:
         # Get title from markdown-title element
         title_elem = link.select_one("p.markdown-title")
         if title_elem:
-            title = title_elem.get_text(strip=True)
+            title = _extract_markdown_title(title_elem)
 
     # Get type and state from icon
     icon = item.select_one("svg[class*='octicon-']")
@@ -205,6 +205,15 @@ def _extract_subject(item: Tag) -> Subject:
         state=state,  # type: ignore[arg-type]
         state_reason=state_reason,  # type: ignore[arg-type]
     )
+
+
+def _extract_markdown_title(title_elem: Tag) -> str:
+    """Extract title text while preserving inline code with backticks."""
+    for code_tag in title_elem.find_all("code"):
+        code_text = code_tag.get_text()
+        code_tag.replace_with(f"`{code_text}`")
+    raw_title = title_elem.get_text()
+    return " ".join(raw_title.split())
 
 
 def _extract_number_from_url(path: str) -> int | None:
