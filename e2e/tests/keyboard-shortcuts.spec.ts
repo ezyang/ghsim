@@ -141,8 +141,8 @@ test.describe('Keyboard Shortcuts', () => {
     // Wait for the notification to be removed
     await expect(page.locator('[data-id="notif-1"]')).not.toBeAttached();
 
-    // The selection should now be on the next notification (notif-2), not back to the first
-    await expect(page.locator('[data-id="notif-2"]')).toHaveClass(/keyboard-selected/);
+    // The selection should now be on the next notification (notif-3), not back to the first
+    await expect(page.locator('[data-id="notif-3"]')).toHaveClass(/keyboard-selected/);
 
     // Scroll position should not have changed significantly (viewport stays stable)
     const scrollAfter = await page.evaluate(() => window.scrollY);
@@ -156,20 +156,19 @@ test.describe('Keyboard Shortcuts', () => {
       route.fulfill({ status: 204 });
     });
 
-    // Navigate to the third notification (notif-3)
-    await page.keyboard.press('j');
+    // Navigate to the middle notification (notif-3)
     await page.keyboard.press('j');
     await page.keyboard.press('j');
     await expect(page.locator('[data-id="notif-3"]')).toHaveClass(/keyboard-selected/);
 
-    // Mark as done - selection should move to notif-4, not notif-1
+    // Mark as done - selection should move to notif-5, not notif-1
     await page.keyboard.press('e');
 
     // Wait for the notification to be removed
     await expect(page.locator('[data-id="notif-3"]')).not.toBeAttached();
 
-    // The selection should be on notif-4 (the next one), NOT notif-1 (the first one)
-    await expect(page.locator('[data-id="notif-4"]')).toHaveClass(/keyboard-selected/);
+    // The selection should be on notif-5 (the next one), NOT notif-1 (the first one)
+    await expect(page.locator('[data-id="notif-5"]')).toHaveClass(/keyboard-selected/);
     await expect(page.locator('[data-id="notif-1"]')).not.toHaveClass(/keyboard-selected/);
   });
 
@@ -251,8 +250,7 @@ test.describe('Keyboard Shortcuts', () => {
   });
 
   test('gg does not change keyboard selection', async ({ page }) => {
-    // Navigate to third notification
-    await page.keyboard.press('j');
+    // Navigate to middle notification
     await page.keyboard.press('j');
     await page.keyboard.press('j');
     await expect(page.locator('[data-id="notif-3"]')).toHaveClass(/keyboard-selected/);

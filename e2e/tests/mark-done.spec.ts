@@ -125,7 +125,7 @@ test.describe('Mark Done', () => {
 
       // Select two items
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
-      await page.locator('[data-id="notif-2"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click();
 
       // Click Mark Done
       await page.locator('#mark-done-btn').click();
@@ -136,7 +136,7 @@ test.describe('Mark Done', () => {
       // Verify API was called for both
       expect(apiCalls.length).toBe(2);
       expect(apiCalls.some((url) => url.includes('notif-1'))).toBe(true);
-      expect(apiCalls.some((url) => url.includes('notif-2'))).toBe(true);
+      expect(apiCalls.some((url) => url.includes('notif-3'))).toBe(true);
     });
 
     test('Mark all in Closed subfilter calls API for each closed issue', async ({ page }) => {
@@ -184,12 +184,12 @@ test.describe('Mark Done', () => {
         route.fulfill({ status: 204 });
       });
 
-      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('.notification-item')).toHaveCount(3);
 
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
 
       await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
       await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
       expect(apiCalls.length).toBe(1);
       expect(apiCalls[0]).toContain('notif-1');
@@ -207,7 +207,7 @@ test.describe('Mark Done', () => {
       await page.locator('[data-id="notif-1"] .notification-done-btn-bottom').click();
 
       await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
       await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
     });
 
@@ -221,7 +221,7 @@ test.describe('Mark Done', () => {
         window.scrollTo(0, 200);
       });
 
-      const nextItem = page.locator('[data-id="notif-2"]');
+      const nextItem = page.locator('[data-id="notif-3"]');
       const beforeTop = await nextItem.evaluate((el) => el.getBoundingClientRect().top);
 
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
@@ -233,6 +233,30 @@ test.describe('Mark Done', () => {
 
       const afterTop = await nextItem.evaluate((el) => el.getBoundingClientRect().top);
       expect(Math.abs(afterTop - beforeTop)).toBeLessThanOrEqual(1);
+    });
+
+    test('removes notification before the Mark Done request completes', async ({ page }) => {
+      let releaseResponse: (() => void) | null = null;
+      const responseGate = new Promise<void>((resolve) => {
+        releaseResponse = resolve;
+      });
+
+      await page.route('**/github/rest/notifications/threads/**', async (route) => {
+        await responseGate;
+        route.fulfill({ status: 204 });
+      });
+
+      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+
+      await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
+
+      if (!releaseResponse) {
+        throw new Error('Expected releaseResponse to be assigned');
+      }
+      releaseResponse();
+
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
     });
   });
 
@@ -266,8 +290,8 @@ test.describe('Mark Done', () => {
 
       // Select 3 items
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
-      await page.locator('[data-id="notif-2"] .notification-checkbox').click();
       await page.locator('[data-id="notif-3"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-5"] .notification-checkbox').click();
 
       await page.locator('#mark-done-btn').click();
 
@@ -301,7 +325,7 @@ test.describe('Mark Done', () => {
       });
 
       // Verify 5 notifications initially
-      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('.notification-item')).toHaveCount(3);
 
       // Select and mark one
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
@@ -309,7 +333,7 @@ test.describe('Mark Done', () => {
 
       await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
 
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
       await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
     });
 
@@ -318,14 +342,14 @@ test.describe('Mark Done', () => {
         route.fulfill({ status: 204 });
       });
 
-      await expect(page.locator('#count-all')).toHaveText('5');
+      await expect(page.locator('#count-all')).toHaveText('3');
 
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
-      await page.locator('[data-id="notif-2"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click();
       await page.locator('#mark-done-btn').click();
 
       await expect(page.locator('#status-bar')).toContainText('Marked 2 notifications as done');
-      await expect(page.locator('#count-all')).toHaveText('3');
+      await expect(page.locator('#count-all')).toHaveText('1');
     });
 
     test('localStorage is updated after marking done', async ({ page }) => {
@@ -402,7 +426,7 @@ test.describe('Mark Done', () => {
       });
 
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
-      await page.locator('[data-id="notif-2"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click();
       await page.locator('#mark-done-btn').click();
 
       await expect(page.locator('#status-bar')).toContainText('1 done');
@@ -422,14 +446,14 @@ test.describe('Mark Done', () => {
       });
 
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
-      await page.locator('[data-id="notif-2"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click();
       await page.locator('#mark-done-btn').click();
 
       await expect(page.locator('#status-bar')).toContainText('failed');
 
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
       await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
-      await expect(page.locator('[data-id="notif-2"]')).toHaveCount(1);
+      await expect(page.locator('[data-id="notif-3"]')).toHaveCount(1);
     });
   });
 
@@ -473,7 +497,7 @@ test.describe('Mark Done', () => {
       await expect(page.locator('#status-bar')).toContainText('Marked');
 
       // Select another item to show button again
-      await page.locator('[data-id="notif-2"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click();
 
       await expect(page.locator('#mark-done-btn')).toBeEnabled();
       await expect(page.locator('#select-all-checkbox')).toBeEnabled();
@@ -605,12 +629,12 @@ test.describe('Mark Done with Node IDs', () => {
       route.fulfill({ status: 204 });
     });
 
-    await expect(page.locator('.notification-item')).toHaveCount(5);
+    await expect(page.locator('.notification-item')).toHaveCount(3);
 
     await page.locator('.notification-item').first().locator('.notification-checkbox').click();
     await page.locator('#mark-done-btn').click();
 
     await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
-    await expect(page.locator('.notification-item')).toHaveCount(4);
+    await expect(page.locator('.notification-item')).toHaveCount(2);
   });
 });

@@ -82,7 +82,7 @@ test.describe('Sync Functionality', () => {
     await expect(page.locator('#status-bar')).toContainText('Synced 5 notifications');
 
     // Check notification count in header
-    await expect(page.locator('#notification-count')).toContainText('5 notifications');
+    await expect(page.locator('#notification-count')).toContainText('3 notifications');
   });
 
   test('sync stores notifications in localStorage', async ({ page }) => {
@@ -634,7 +634,7 @@ test.describe('Sync Functionality', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Notifications should still be displayed (loaded from localStorage)
-    await expect(page.locator('#notification-count')).toContainText('5 notifications');
+    await expect(page.locator('#notification-count')).toContainText('3 notifications');
 
     // Empty state should be hidden
     await expect(page.locator('#empty-state')).not.toBeVisible();
@@ -1031,7 +1031,7 @@ test.describe('Error Handling', () => {
     await expect(page.locator('#status-bar')).toContainText('Sync failed');
 
     // Original notifications should still be displayed
-    await expect(page.locator('#notification-count')).toContainText('5 notifications');
+    await expect(page.locator('#notification-count')).toContainText('3 notifications');
   });
 });
 
@@ -1065,7 +1065,7 @@ test.describe('Notifications Display', () => {
 
     // Check that notification titles are displayed
     const list = page.locator('#notifications-list');
-    await expect(list.locator('li')).toHaveCount(5);
+    await expect(list.locator('li')).toHaveCount(3);
 
     // First notification should have its title
     await expect(list.locator('li').first()).toContainText('Fix critical bug in authentication');

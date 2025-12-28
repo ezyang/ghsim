@@ -43,7 +43,7 @@ test.describe('Polish', () => {
     test('Escape key clears selection', async ({ page }) => {
       // Select some items
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
-      await page.locator('[data-id="notif-2"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click();
 
       await expect(page.locator('#selection-count')).toHaveText('2 selected');
 
@@ -53,7 +53,7 @@ test.describe('Polish', () => {
       // Selection should be cleared
       await expect(page.locator('#selection-count')).toHaveText('');
       await expect(page.locator('[data-id="notif-1"]')).not.toHaveClass(/selected/);
-      await expect(page.locator('[data-id="notif-2"]')).not.toHaveClass(/selected/);
+      await expect(page.locator('[data-id="notif-3"]')).not.toHaveClass(/selected/);
     });
 
     test('Escape does nothing when no selection', async ({ page }) => {
@@ -61,7 +61,7 @@ test.describe('Polish', () => {
       await page.keyboard.press('Escape');
 
       // No errors, page still works
-      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('.notification-item')).toHaveCount(3);
     });
 
     test('Ctrl+A selects all notifications', async ({ page }) => {
@@ -69,7 +69,7 @@ test.describe('Polish', () => {
       await page.keyboard.press('Control+a');
 
       // All items should be selected
-      await expect(page.locator('#selection-count')).toHaveText('5 selected');
+      await expect(page.locator('#selection-count')).toHaveText('3 selected');
       await expect(page.locator('#select-all-checkbox')).toBeChecked();
     });
 
@@ -78,7 +78,7 @@ test.describe('Polish', () => {
       await page.keyboard.press('Meta+a');
 
       // All items should be selected
-      await expect(page.locator('#selection-count')).toHaveText('5 selected');
+      await expect(page.locator('#selection-count')).toHaveText('3 selected');
     });
 
     test('keyboard shortcuts do not work in input field', async ({ page }) => {
@@ -190,7 +190,7 @@ test.describe('Polish', () => {
 
       // Select just a few items
       await page.locator('[data-id="notif-1"] .notification-checkbox').click();
-      await page.locator('[data-id="notif-2"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click();
 
       // Click Mark Done - should proceed without confirmation
       await page.locator('#mark-done-btn').click();
@@ -336,7 +336,7 @@ test.describe('Polish', () => {
 
       // Remaining checkboxes should be enabled
       const checkboxes = page.locator('.notification-item .notification-checkbox');
-      await expect(checkboxes).toHaveCount(4);
+      await expect(checkboxes).toHaveCount(2);
       const enabledStates = await checkboxes.evaluateAll((nodes) =>
         nodes.map((node) => !node.disabled)
       );

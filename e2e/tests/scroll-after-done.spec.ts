@@ -221,8 +221,8 @@ test.describe('Scroll After Done', () => {
     });
     expect(headerVisible).toBe(false);
 
-    // Get the second notification element before marking done
-    const secondNotification = page.locator('[data-id="notif-2"]');
+    // Get the next issue notification element before marking done
+    const secondNotification = page.locator('[data-id="notif-3"]');
     await expect(secondNotification).toBeVisible();
 
     // Mock the mark done API

@@ -206,6 +206,7 @@ test.describe('Notification Rendering', () => {
       const issueItem = page.locator('[data-id="issue-open"]');
       await expect(issueItem).toHaveAttribute('data-type', 'Issue');
 
+      await page.locator('#view-others-prs').click();
       const prItem = page.locator('[data-id="pr-open"]');
       await expect(prItem).toHaveAttribute('data-type', 'PullRequest');
     });
@@ -217,6 +218,7 @@ test.describe('Notification Rendering', () => {
       const closedItem = page.locator('[data-id="issue-closed"]');
       await expect(closedItem).toHaveAttribute('data-state', 'closed');
 
+      await page.locator('#view-others-prs').click();
       const mergedItem = page.locator('[data-id="pr-merged"]');
       await expect(mergedItem).toHaveAttribute('data-state', 'merged');
     });
@@ -224,7 +226,9 @@ test.describe('Notification Rendering', () => {
     test('notification shows inline unsubscribe button (bottom only appears when comments expanded)', async ({
       page,
     }) => {
-      const totalNotifications = testNotifications.notifications.length;
+      const totalNotifications = testNotifications.notifications.filter(
+        (notification) => notification.subject.type === 'Issue'
+      ).length;
       // Without comments expanded, only inline unsubscribe buttons are shown
       await expect(page.locator('.notification-unsubscribe-btn')).toHaveCount(totalNotifications);
       // Bottom unsubscribe buttons only appear when comments are expanded
@@ -240,6 +244,7 @@ test.describe('Notification Rendering', () => {
     });
 
     test('PR notifications have PR icon', async ({ page }) => {
+      await page.locator('#view-others-prs').click();
       const prIcon = page.locator('[data-id="pr-open"] .notification-icon');
       await expect(prIcon).toHaveAttribute('data-type', 'PullRequest');
       await expect(prIcon.locator('svg')).toBeAttached();
@@ -256,11 +261,13 @@ test.describe('Notification Rendering', () => {
     });
 
     test('merged items have merged icon class', async ({ page }) => {
+      await page.locator('#view-others-prs').click();
       const mergedIcon = page.locator('[data-id="pr-merged"] .notification-icon');
       await expect(mergedIcon).toHaveClass(/merged/);
     });
 
     test('draft items have draft icon class', async ({ page }) => {
+      await page.locator('#view-others-prs').click();
       const draftIcon = page.locator('[data-id="pr-draft"] .notification-icon');
       await expect(draftIcon).toHaveClass(/draft/);
     });
@@ -282,6 +289,7 @@ test.describe('Notification Rendering', () => {
     });
 
     test('merged state badge is displayed', async ({ page }) => {
+      await page.locator('#view-others-prs').click();
       const badge = page.locator('[data-id="pr-merged"] .state-badge');
       await expect(badge).toBeVisible();
       await expect(badge).toHaveClass(/merged/);
@@ -289,6 +297,7 @@ test.describe('Notification Rendering', () => {
     });
 
     test('draft state badge is displayed', async ({ page }) => {
+      await page.locator('#view-others-prs').click();
       const badge = page.locator('[data-id="pr-draft"] .state-badge');
       await expect(badge).toBeVisible();
       await expect(badge).toHaveClass(/draft/);
@@ -308,6 +317,7 @@ test.describe('Notification Rendering', () => {
     });
 
     test('PR number is displayed', async ({ page }) => {
+      await page.locator('#view-others-prs').click();
       const number = page.locator('[data-id="pr-open"] .notification-number');
       await expect(number).toContainText('#10');
     });
@@ -325,6 +335,7 @@ test.describe('Notification Rendering', () => {
     });
 
     test('review_requested reason is displayed', async ({ page }) => {
+      await page.locator('#view-others-prs').click();
       const reason = page.locator('[data-id="pr-open"] .notification-reason');
       await expect(reason).toContainText('Review requested');
     });
@@ -370,6 +381,7 @@ test.describe('Notification Rendering', () => {
     });
 
     test('multiple actor avatars are displayed', async ({ page }) => {
+      await page.locator('#view-others-prs').click();
       const actors = page.locator('[data-id="pr-open"] .notification-actors');
       const avatars = actors.locator('.actor-avatar');
       await expect(avatars).toHaveCount(2);

@@ -149,6 +149,27 @@
             elements.selectAllCheckbox.disabled = true;
             render();
 
+            const selectedIdSet = new Set(selectedIds);
+            const filteredBeforeRemoval = getFilteredNotifications();
+            const scrollAnchor = captureScrollAnchor(selectedIds, filteredBeforeRemoval);
+            const notificationsToRestoreOnFailure = selectedIds
+                .map(id => notificationLookup.get(id))
+                .filter(Boolean);
+
+            state.notifications = state.notifications.filter(
+                notif => !selectedIdSet.has(notif.id)
+            );
+
+            // Clear selection for removed items
+            selectedIds.forEach(id => state.selected.delete(id));
+
+            // Update localStorage
+            persistNotifications();
+            render();
+            requestAnimationFrame(() => {
+                restoreScrollAnchor(scrollAnchor);
+            });
+
             const successfulIds = [];
             const failedResults = []; // Store {id, error} for detailed reporting
             let rateLimitDelay = 0;
@@ -194,21 +215,15 @@
                 }
             }
 
-            const filteredBeforeRemoval = getFilteredNotifications();
-            const scrollAnchor = captureScrollAnchor(successfulIds, filteredBeforeRemoval);
-            const successfulIdSet = new Set(successfulIds);
-            const notificationsToRestore = successfulIds
-                .map(id => notificationLookup.get(id))
-                .filter(Boolean);
-            state.notifications = state.notifications.filter(
-                notif => !successfulIdSet.has(notif.id)
-            );
-
-            // Clear selection for successful items
-            successfulIds.forEach(id => state.selected.delete(id));
-
-            // Update localStorage
-            persistNotifications();
+            if (failedResults.length > 0) {
+                const failedIdSet = new Set(failedResults.map(result => result.id));
+                const failedNotifications = notificationsToRestoreOnFailure.filter(notification =>
+                    failedIdSet.has(notification.id)
+                );
+                restoreNotificationsInOrder(failedNotifications);
+                failedNotifications.forEach(notification => state.selected.add(notification.id));
+                persistNotifications();
+            }
 
             // Reset marking state
             state.markingInProgress = false;
@@ -231,8 +246,11 @@
                 console.error('[MarkDone] Partial failure. Errors:', failedResults);
             }
 
-            if (notificationsToRestore.length > 0) {
-                pushToUndoStack('done', notificationsToRestore);
+            const notificationsForUndo = successfulIds
+                .map(id => notificationLookup.get(id))
+                .filter(Boolean);
+            if (notificationsForUndo.length > 0) {
+                pushToUndoStack('done', notificationsForUndo);
             }
 
             await refreshRateLimit();
@@ -506,12 +524,34 @@
 
             // Find and save the notification for undo before removing
             const notificationToRemove = state.notifications.find(n => n.id === notifId);
+            const wasSelected = state.selected.has(notifId);
+
+            const filteredBeforeRemoval = getFilteredNotifications();
+            scrollAnchor = captureScrollAnchor([notifId], filteredBeforeRemoval);
+            advanceActiveNotificationBeforeRemoval(notifId, filteredBeforeRemoval);
+            state.notifications = state.notifications.filter(
+                n => n.id !== notifId
+            );
+            state.selected.delete(notifId);
+            persistNotifications();
+            render();
+            requestAnimationFrame(() => {
+                restoreScrollAnchor(scrollAnchor);
+            });
 
             try {
                 const result = await markNotificationDone(notifId);
 
                 if (result.rateLimited) {
                     showStatus('Rate limited. Please try again shortly.', 'info');
+                    if (notificationToRemove) {
+                        restoreNotificationsInOrder([notificationToRemove]);
+                        if (wasSelected) {
+                            state.selected.add(notifId);
+                        }
+                        persistNotifications();
+                        render();
+                    }
                     button.disabled = false;
                     return;
                 }
@@ -519,18 +559,17 @@
                 if (!result.success) {
                     const errorDetail = result.error || `HTTP ${result.status || 'unknown'}`;
                     showStatus(`Failed to mark notification: ${errorDetail}`, 'error');
+                    if (notificationToRemove) {
+                        restoreNotificationsInOrder([notificationToRemove]);
+                        if (wasSelected) {
+                            state.selected.add(notifId);
+                        }
+                        persistNotifications();
+                        render();
+                    }
                     button.disabled = false;
                     return;
                 }
-
-                const filteredBeforeRemoval = getFilteredNotifications();
-                scrollAnchor = captureScrollAnchor([notifId], filteredBeforeRemoval);
-                advanceActiveNotificationBeforeRemoval(notifId, filteredBeforeRemoval);
-                state.notifications = state.notifications.filter(
-                    n => n.id !== notifId
-                );
-                state.selected.delete(notifId);
-                persistNotifications();
 
                 // Save for undo
                 if (notificationToRemove) {
@@ -540,6 +579,14 @@
             } catch (e) {
                 const errorDetail = e.message || String(e);
                 showStatus(`Failed to mark notification: ${errorDetail}`, 'error');
+                if (notificationToRemove) {
+                    restoreNotificationsInOrder([notificationToRemove]);
+                    if (wasSelected) {
+                        state.selected.add(notifId);
+                    }
+                    persistNotifications();
+                    render();
+                }
                 button.disabled = false;
                 return;
             }
@@ -622,6 +669,25 @@
             state.undoInProgress = false;
         }
 
+        function restoreNotificationsInOrder(notifications) {
+            const notificationsToRestore = notifications
+                .slice()
+                .sort(
+                    (a, b) =>
+                        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                );
+            notificationsToRestore.forEach(notification => {
+                const insertIndex = state.notifications.findIndex(
+                    n => new Date(n.updated_at) < new Date(notification.updated_at)
+                );
+                if (insertIndex === -1) {
+                    state.notifications.push(notification);
+                } else {
+                    state.notifications.splice(insertIndex, 0, notification);
+                }
+            });
+        }
+
         function pushToUndoStack(action, notifications) {
             const normalizedNotifications = Array.isArray(notifications)
                 ? notifications
@@ -686,22 +752,7 @@
                 }
 
                 // Restore notifications to the list in updated_at order
-                const notificationsToRestore = undoItem.notifications
-                    .slice()
-                    .sort(
-                        (a, b) =>
-                            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-                    );
-                notificationsToRestore.forEach(notification => {
-                    const insertIndex = state.notifications.findIndex(
-                        n => new Date(n.updated_at) < new Date(notification.updated_at)
-                    );
-                    if (insertIndex === -1) {
-                        state.notifications.push(notification);
-                    } else {
-                        state.notifications.splice(insertIndex, 0, notification);
-                    }
-                });
+                restoreNotificationsInOrder(undoItem.notifications);
 
                 persistNotifications();
                 const restoredCount = undoItem.notifications.length;

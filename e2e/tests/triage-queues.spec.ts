@@ -131,7 +131,8 @@ test.describe('Triage queues', () => {
     await expect(othersPrsSubfilters.locator('[data-subfilter="needs-review"] .count')).toHaveText('1');
     await expect(othersPrsSubfilters.locator('[data-subfilter="approved"] .count')).toHaveText('1');
 
-    // needs-review is the default subfilter for others-prs
+    // Use needs-review subfilter to isolate the queue
+    await othersPrsSubfilters.locator('[data-subfilter="needs-review"]').click();
     await expect(page.locator('.notification-item')).toHaveCount(1);
     await expect(page.locator('[data-id="thread-pr-1"]')).toBeVisible();
     await expect(page.locator('.comment-tag.needs-review')).toHaveText('Needs review');
@@ -282,4 +283,3 @@ test.describe('Triage queues', () => {
     await expect(unsubscribeAllBtn).toBeVisible();
   });
 });
-

@@ -62,18 +62,18 @@ test.describe('Undo', () => {
         });
       });
 
-      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('.notification-item')).toHaveCount(3);
 
       // Mark as done
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Press u to undo
       await page.keyboard.press('u');
 
       // Notification should be restored
       await expect(page.locator('#status-bar')).toContainText('Undo successful');
-      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('.notification-item')).toHaveCount(3);
     });
 
     test('pressing u does nothing when no undo available', async ({ page }) => {
@@ -86,7 +86,7 @@ test.describe('Undo', () => {
 
     test('u key is ignored when typing in input', async ({ page }) => {
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Focus on repo input and type 'u'
       await page.locator('#repo-input').focus();
@@ -109,20 +109,20 @@ test.describe('Undo', () => {
 
       // Mark two notifications as done
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
 
-      await page.locator('[data-id="notif-2"] .notification-done-btn').click();
-      await expect(page.locator('.notification-item')).toHaveCount(3);
+      await page.locator('[data-id="notif-3"] .notification-done-btn').click();
+      await expect(page.locator('.notification-item')).toHaveCount(1);
 
       // Undo should only restore the second one
       await page.keyboard.press('u');
-      await expect(page.locator('.notification-item')).toHaveCount(4);
-      await expect(page.locator('[data-id="notif-2"]')).toBeVisible();
+      await expect(page.locator('.notification-item')).toHaveCount(2);
+      await expect(page.locator('[data-id="notif-3"]')).toBeVisible();
       await expect(page.locator('[data-id="notif-1"]')).not.toBeVisible();
 
       // Second undo should do nothing (stack is empty)
       await page.keyboard.press('u');
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
     });
 
   });
@@ -139,13 +139,13 @@ test.describe('Undo', () => {
 
       // Mark the first notification as done
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Undo
       await page.keyboard.press('u');
 
       // Should be restored to the list
-      await expect(page.locator('.notification-item')).toHaveCount(5);
+      await expect(page.locator('.notification-item')).toHaveCount(3);
       await expect(page.locator('[data-id="notif-1"]')).toBeVisible();
     });
 
@@ -159,7 +159,7 @@ test.describe('Undo', () => {
       });
 
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
-      await expect(page.locator('.notification-item')).toHaveCount(4);
+      await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Check localStorage after mark done
       let savedNotifications = await page.evaluate(() => {
