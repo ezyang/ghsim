@@ -12,7 +12,7 @@ from __future__ import annotations
 from ghsim.api.fetcher import NotificationsFetcher
 from ghsim.flows.base import BaseFlow
 from ghsim.github_api import save_response, RESPONSES_DIR
-from ghsim.parser.notifications import parse_notifications_html
+from ghsim.parser.notifications import parse_notifications_html, extract_authenticity_token
 
 
 class ProdNotificationsSnapshotFlow(BaseFlow):
@@ -54,6 +54,7 @@ class ProdNotificationsSnapshotFlow(BaseFlow):
 
         after_cursor = None
         captured = 0
+        tokens: list[tuple[int, str]] = []  # (page_num, token)
 
         with NotificationsFetcher(
             account=self.owner_account, headless=self.headless
@@ -85,6 +86,14 @@ class ProdNotificationsSnapshotFlow(BaseFlow):
                     "json",
                 )
 
+                # Extract authenticity_token for verification
+                token = extract_authenticity_token(result.html)
+                if token:
+                    tokens.append((page_num, token))
+                    print(f"  Page {page_num} token: {token[:20]}...")
+                else:
+                    print(f"  Page {page_num} token: NOT FOUND")
+
                 print(f"  Page {page_num} HTML: {html_path}")
                 print(f"  Page {page_num} JSON: {json_path}")
                 captured += 1
@@ -94,6 +103,21 @@ class ProdNotificationsSnapshotFlow(BaseFlow):
                 after_cursor = parsed.pagination.after_cursor
 
         print(f"\nSaved {captured} page(s) to: {RESPONSES_DIR}")
+
+        # Report on token stability across pages
+        if len(tokens) > 1:
+            first_token = tokens[0][1]
+            all_same = all(t[1] == first_token for t in tokens)
+            print("\nAuthenticity token stability check:")
+            print(f"  Pages compared: {len(tokens)}")
+            print(f"  All tokens identical: {all_same}")
+            if not all_same:
+                print("  Token values per page:")
+                for page_num, token in tokens:
+                    print(f"    Page {page_num}: {token[:40]}...")
+        elif len(tokens) == 1:
+            print("\nAuthenticity token captured (single page):")
+            print(f"  Token: {tokens[0][1][:40]}...")
         return True
 
     def _parse_repo(self, value: str) -> tuple[str, str] | None:

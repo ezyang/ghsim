@@ -1239,6 +1239,15 @@
                     location.reload();
                     return;
                 }
+                if (e.key === 'Enter') {
+                    const item = getNotificationElement(state.activeNotificationId);
+                    const link = item?.querySelector('.notification-title');
+                    if (link?.href) {
+                        e.preventDefault();
+                        window.open(link.href, '_blank');
+                    }
+                    return;
+                }
             }
 
             // Escape: Clear selection

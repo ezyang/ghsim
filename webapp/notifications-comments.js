@@ -258,30 +258,14 @@ function getCommentItems(notification) {
             const author = comment.user?.login || 'unknown';
             const timestamp = comment.updated_at || comment.created_at || '';
             const bodyRaw = comment.body || '';
-            const commentId = String(comment.id);
-            const expanded = state.commentBodyExpanded.has(commentId);
             const renderedBody = renderMarkdown(bodyRaw);
-            const bodyClass = expanded
-                ? 'comment-body markdown-body'
-                : 'comment-body markdown-body collapsed';
-            const toggleLabel = expanded ? 'Show less' : 'Show more';
-            const toggleButton = `
-                <button
-                    type="button"
-                    class="comment-body-toggle-btn is-hidden"
-                    data-comment-id="${escapeHtml(commentId)}"
-                >
-                    ${toggleLabel}
-                </button>
-            `;
             return `
                 <li class="comment-item">
                     <div class="comment-meta">
                         <span>${escapeHtml(author)}</span>
                         <span>${escapeHtml(new Date(timestamp).toLocaleString())}</span>
                     </div>
-                    <div class="${bodyClass}">${renderedBody}</div>
-                    ${toggleButton}
+                    <div class="comment-body markdown-body">${renderedBody}</div>
                 </li>
             `;
         })

@@ -310,3 +310,38 @@ def _extract_cursor_from_href(href: str, param: str) -> str | None:
     if values:
         return values[0]
     return None
+
+
+def extract_authenticity_token(html: str) -> str | None:
+    """
+    Extract an authenticity_token from the notifications page.
+
+    GitHub includes CSRF tokens in forms. Any token from the page can be used
+    for form submissions within the same session. We look for the bulk archive
+    form's token as it's reliably present.
+
+    Args:
+        html: The raw HTML content of the notifications page
+
+    Returns:
+        The authenticity_token value, or None if not found
+    """
+    soup = BeautifulSoup(html, "lxml")
+
+    # Look for the bulk archive form's token (most reliably present)
+    bulk_form = soup.select_one('form[action="/notifications/beta/archive"]')
+    if bulk_form:
+        token_input = bulk_form.select_one('input[name="authenticity_token"]')
+        if token_input:
+            value = token_input.get("value")
+            if isinstance(value, str):
+                return value
+
+    # Fallback: try any form with authenticity_token
+    token_input = soup.select_one('input[name="authenticity_token"]')
+    if token_input:
+        value = token_input.get("value")
+        if isinstance(value, str):
+            return value
+
+    return None

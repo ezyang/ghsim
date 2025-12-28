@@ -166,4 +166,40 @@ test.describe('Keyboard Shortcuts', () => {
     await expect(page.locator('[data-id="notif-4"]')).toHaveClass(/keyboard-selected/);
     await expect(page.locator('[data-id="notif-1"]')).not.toHaveClass(/keyboard-selected/);
   });
+
+  test('Enter opens the active notification in a new tab', async ({ page, context }) => {
+    // Navigate to first notification
+    await page.keyboard.press('j');
+    await expect(page.locator('[data-id="notif-1"]')).toHaveClass(/keyboard-selected/);
+
+    // Listen for new page (popup/tab)
+    const pagePromise = context.waitForEvent('page');
+
+    // Press Enter to open the notification
+    await page.keyboard.press('Enter');
+
+    // Verify new tab was opened with the correct URL
+    const newPage = await pagePromise;
+    expect(newPage.url()).toBe('https://github.com/test/repo/issues/42');
+  });
+
+  test('Enter does nothing when no notification is selected', async ({ page, context }) => {
+    // Verify no notification is selected
+    await expect(page.locator('.notification-item.keyboard-selected')).toHaveCount(0);
+
+    // Set up a promise that will reject if a new page opens
+    let newPageOpened = false;
+    context.on('page', () => {
+      newPageOpened = true;
+    });
+
+    // Press Enter
+    await page.keyboard.press('Enter');
+
+    // Wait a moment to ensure no page opens
+    await page.waitForTimeout(100);
+
+    // No new page should have opened
+    expect(newPageOpened).toBe(false);
+  });
 });
