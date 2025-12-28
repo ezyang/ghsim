@@ -347,6 +347,21 @@
             color: var(--color-danger-fg);
         }
 
+        .status-bar.flash {
+            animation: status-flash 0.6s ease-out;
+        }
+
+        @keyframes status-flash {
+            0% {
+                transform: translateY(-2px);
+                box-shadow: 0 0 0 0 rgba(9, 105, 218, 0.25);
+            }
+            100% {
+                transform: translateY(0);
+                box-shadow: 0 0 0 12px rgba(9, 105, 218, 0);
+            }
+        }
+
         /* Notifications list */
         .notifications-container {
             background: var(--color-bg-default);
@@ -1365,7 +1380,7 @@
                 return;
             }
             showStatus('Fetching comments for triage filters...', 'info');
-            ensureLastReadAtData(getActiveNotifications())
+            ensureLastReadAtData(state.notifications)
                 .then((notifications) => {
                     state.notifications = notifications;
                     persistNotifications();
@@ -1592,6 +1607,21 @@
             return `ms:${parsed}`;
         }
 
+        function formatCursorLabel(cursor) {
+            if (!cursor) {
+                return 'initial';
+            }
+            const raw = String(cursor);
+            if (raw.length <= 10) {
+                return `after ${raw}`;
+            }
+            return `after ${raw.slice(0, 4)}...${raw.slice(-4)}`;
+        }
+
+        function countMissingLastReadAt(notifications) {
+            return notifications.filter((notif) => !notif.last_read_at).length;
+        }
+
         function buildPreviousMatchMap(notifications) {
             const map = new Map();
             notifications.forEach((notif, index) => {
@@ -1670,6 +1700,7 @@
             const result = new Map();
             const maxPages = 5;
             for (let page = 1; page <= maxPages; page += 1) {
+                const remainingCount = targetKeys.size - result.size;
                 const params = new URLSearchParams();
                 params.set('all', 'true');
                 params.set('per_page', '50');
@@ -1677,6 +1708,11 @@
                 const url = `/github/rest/notifications?${params}`;
                 let payload = [];
                 try {
+                    showStatus(
+                        `Last read lookup: requesting REST page ${page} (${remainingCount} remaining)`,
+                        'info',
+                        { flash: true }
+                    );
                     payload = await fetchJson(url);
                 } catch (error) {
                     showStatus(`Rate limit fetch failed: ${error.message || error}`, 'error');
@@ -1691,6 +1727,10 @@
                         result.set(key, notif);
                     }
                 });
+                showStatus(
+                    `Last read lookup: received ${payload.length} notifications (matched ${result.size}/${targetKeys.size})`,
+                    'info'
+                );
                 const remaining = [...targetKeys].filter((id) => !result.has(id));
                 if (remaining.length === 0) {
                     break;
@@ -1704,6 +1744,11 @@
             if (!missing.length) {
                 return notifications;
             }
+            showStatus(
+                `Last read lookup: ${missing.length} notifications missing last_read_at`,
+                'info',
+                { flash: true }
+            );
             const cachedLastReadAt = new Map();
             missing.forEach((notif) => {
                 const cached = state.commentCache.threads[getNotificationKey(notif)];
@@ -2757,7 +2802,7 @@
 
         // Get appropriate empty state message
         function getEmptyStateMessage() {
-            if (getActiveNotifications().length === 0) {
+            if (state.notifications.length === 0) {
                 return {
                     title: 'No notifications',
                     message: 'Enter a repository and click Quick Sync to load notifications.',

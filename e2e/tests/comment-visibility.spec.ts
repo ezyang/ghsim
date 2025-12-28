@@ -159,8 +159,7 @@ test.describe('Comment visibility', () => {
     await expect(page.locator('#status-bar')).toContainText(
       'Marked 1 notification as done'
     );
-    await expect(page.locator('.notification-item')).toHaveCount(1);
-    await expect(page.locator('.notification-item.tombstone')).toHaveCount(1);
+    await expect(page.locator('.notification-item')).toHaveCount(0);
   });
 });
 

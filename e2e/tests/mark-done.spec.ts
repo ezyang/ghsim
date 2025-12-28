@@ -204,6 +204,30 @@ test.describe('Mark Done', () => {
       await expect(page.locator('.notification-item')).toHaveCount(4);
       await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
     });
+
+    test('keeps the next notification anchored after removal', async ({ page }) => {
+      await page.setViewportSize({ width: 1200, height: 360 });
+      await page.route('**/github/rest/notifications/threads/**', (route) => {
+        route.fulfill({ status: 204 });
+      });
+
+      await page.evaluate(() => {
+        window.scrollTo(0, 200);
+      });
+
+      const nextItem = page.locator('[data-id="notif-2"]');
+      const beforeTop = await nextItem.evaluate((el) => el.getBoundingClientRect().top);
+
+      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+
+      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
+
+      await page.evaluate(() => new Promise(requestAnimationFrame));
+
+      const afterTop = await nextItem.evaluate((el) => el.getBoundingClientRect().top);
+      expect(Math.abs(afterTop - beforeTop)).toBeLessThanOrEqual(1);
+    });
   });
 
   test.describe('Progress Indicator', () => {
@@ -570,7 +594,7 @@ test.describe('Mark Done with Node IDs', () => {
     await expect(page.locator('#status-bar')).toHaveClass(/error/);
   });
 
-  test('tombstones notification after successful REST API mark done with node ID', async ({ page }) => {
+  test('removes notification after successful REST API mark done with node ID', async ({ page }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
       route.fulfill({ status: 204 });
     });
@@ -581,7 +605,6 @@ test.describe('Mark Done with Node IDs', () => {
     await page.locator('#mark-done-btn').click();
 
     await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
-    await expect(page.locator('.notification-item')).toHaveCount(5);
-    await expect(page.locator('.notification-item.tombstone')).toHaveCount(1);
+    await expect(page.locator('.notification-item')).toHaveCount(4);
   });
 });

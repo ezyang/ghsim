@@ -82,7 +82,7 @@ test.describe('Keyboard Shortcuts', () => {
     await page.keyboard.press('e');
 
     await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
-    await expect(page.locator('[data-id="notif-1"]')).toHaveClass(/tombstone/);
+    await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
   });
 
   test('m unsubscribes the active approved notification', async ({ page }) => {

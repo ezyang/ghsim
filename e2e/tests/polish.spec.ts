@@ -333,9 +333,7 @@ test.describe('Polish', () => {
       await expect(page.locator('#status-bar')).toContainText('Marked');
 
       // Remaining checkboxes should be enabled
-      const checkboxes = page.locator(
-        '.notification-item:not(.tombstone) .notification-checkbox'
-      );
+      const checkboxes = page.locator('.notification-item .notification-checkbox');
       await expect(checkboxes).toHaveCount(4);
       const enabledStates = await checkboxes.evaluateAll((nodes) =>
         nodes.map((node) => !node.disabled)
