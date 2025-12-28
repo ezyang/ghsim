@@ -91,8 +91,11 @@ def main() -> int:
     )
     parser.add_argument(
         "--host",
-        default="127.0.0.1",
-        help="Host to bind to (default: 127.0.0.1)",
+        default="0.0.0.0",
+        help=(
+            "Host to bind to (default: 0.0.0.0, listens on localhost and "
+            "Tailnet 10.*.*.*)."
+        ),
     )
     parser.add_argument(
         "--port",
@@ -168,8 +171,9 @@ def main() -> int:
         os.environ["GHSIM_ACCOUNT"] = account
         os.environ["GHSIM_HEADLESS"] = "0" if args.headed else "1"
 
-    print(f"Server: http://{args.host}:{args.port}")
-    print(f"API docs: http://{args.host}:{args.port}/docs")
+    display_host = "127.0.0.1" if args.host == "0.0.0.0" else args.host
+    print(f"Server: http://{display_host}:{args.port}")
+    print(f"API docs: http://{display_host}:{args.port}/docs")
     print()
 
     uvicorn.run(

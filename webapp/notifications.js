@@ -654,13 +654,22 @@
         // Handle individual notification checkbox click
         function handleNotificationCheckbox(notifId, event) {
             const filtered = getFilteredNotifications();
+            const shouldSelect = event.target.checked;
 
             if (event.shiftKey && state.lastClickedId) {
-                // Shift-click: select range
-                selectRange(state.lastClickedId, notifId, filtered);
+                // Shift-click: apply the clicked state across the range.
+                const applied = applyRangeSelection(
+                    state.lastClickedId,
+                    notifId,
+                    filtered,
+                    shouldSelect
+                );
+                if (!applied) {
+                    setSelection(notifId, shouldSelect);
+                }
             } else {
-                // Regular click: toggle single
-                toggleSelection(notifId);
+                // Regular click: match the checkbox state.
+                setSelection(notifId, shouldSelect);
             }
 
             state.lastClickedId = notifId;
@@ -676,20 +685,29 @@
             }
         }
 
-        // Select a range of notifications (for shift-click)
-        function selectRange(fromId, toId, notifications) {
+        function setSelection(notifId, shouldSelect) {
+            if (shouldSelect) {
+                state.selected.add(notifId);
+            } else {
+                state.selected.delete(notifId);
+            }
+        }
+
+        // Apply a selection state across a range of notifications (for shift-click)
+        function applyRangeSelection(fromId, toId, notifications, shouldSelect) {
             const ids = notifications.map(n => n.id);
             const fromIndex = ids.indexOf(fromId);
             const toIndex = ids.indexOf(toId);
 
-            if (fromIndex === -1 || toIndex === -1) return;
+            if (fromIndex === -1 || toIndex === -1) return false;
 
             const start = Math.min(fromIndex, toIndex);
             const end = Math.max(fromIndex, toIndex);
 
             for (let i = start; i <= end; i++) {
-                state.selected.add(ids[i]);
+                setSelection(ids[i], shouldSelect);
             }
+            return true;
         }
 
         // Clear all selections

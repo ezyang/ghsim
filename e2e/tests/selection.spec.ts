@@ -239,6 +239,21 @@ test.describe('Selection', () => {
       await expect(page.locator('[data-id="notif-5"]')).not.toHaveClass(/selected/);
     });
 
+    test('shift-click can bulk unselect a range', async ({ page }) => {
+      await page.locator('[data-id="notif-1"] .notification-checkbox').click();
+      await page.locator('[data-id="notif-3"] .notification-checkbox').click({
+        modifiers: ['Shift'],
+      });
+
+      await page.locator('[data-id="notif-2"] .notification-checkbox').click({
+        modifiers: ['Shift'],
+      });
+
+      await expect(page.locator('[data-id="notif-1"]')).toHaveClass(/selected/);
+      await expect(page.locator('[data-id="notif-2"]')).not.toHaveClass(/selected/);
+      await expect(page.locator('[data-id="notif-3"]')).not.toHaveClass(/selected/);
+    });
+
     test('shift-click without previous selection works as regular click', async ({ page }) => {
       // Shift-click without any previous selection
       await page.locator('[data-id="notif-3"] .notification-checkbox').click({

@@ -108,6 +108,33 @@ test.describe('UI Shell', () => {
       await expect(rateLimit).toBeVisible();
       await expect(rateLimit).toContainText('Rate limit: 42/60');
     });
+
+    test('force refresh button reloads with cache busting', async ({ page }) => {
+      const forceRefreshBtn = page.locator('#force-refresh-btn');
+      await expect(forceRefreshBtn).toBeVisible();
+
+      await Promise.all([
+        page.waitForURL(/cache_bust=/),
+        forceRefreshBtn.click(),
+      ]);
+
+      expect(page.url()).toContain('cache_bust=');
+
+      const cssHref = await page
+        .locator('link[href*="notifications.css"]')
+        .getAttribute('href');
+      expect(cssHref).toMatch(/notifications\.css\?v=/);
+
+      const commentsJsHref = await page
+        .locator('script[src*="notifications-comments.js"]')
+        .getAttribute('src');
+      expect(commentsJsHref).toMatch(/notifications-comments\.js\?v=/);
+
+      const appJsHref = await page
+        .locator('script[src*="notifications.js"]')
+        .getAttribute('src');
+      expect(appJsHref).toMatch(/notifications\.js\?v=/);
+    });
   });
 
   test.describe('Notifications Section', () => {

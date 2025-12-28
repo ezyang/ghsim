@@ -4,8 +4,94 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bulk Notifications Editor</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.1/github-markdown-light.css">
-    <link rel="stylesheet" href="notifications.css">
+    <script>
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const cacheBust = params.get('cache_bust') || localStorage.getItem('ghnotif_cache_bust');
+            if (cacheBust) {
+                localStorage.setItem('ghnotif_cache_bust', cacheBust);
+            }
+            const bust = cacheBust ? `?v=${encodeURIComponent(cacheBust)}` : '';
+            document.write(
+                '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.1/github-markdown-light.css">'
+            );
+            document.write(`<link rel="stylesheet" href="notifications.css${bust}">`);
+        })();
+    </script>
+    <style>
+        @media (max-width: 640px) {
+            .notifications-container {
+                overflow-x: hidden;
+            }
+
+            .notification-item {
+                flex-wrap: wrap;
+                gap: 8px;
+                padding: 12px 10px;
+            }
+
+            .notification-icon {
+                order: 1;
+                margin-top: 0;
+            }
+
+            .notification-content {
+                display: contents;
+            }
+
+            .notification-title {
+                order: 2;
+                flex: 1 1 calc(100% - 24px);
+                min-width: 0;
+            }
+
+            .notification-meta {
+                order: 4;
+                flex: 1 1 60%;
+                min-width: 0;
+                gap: 6px;
+            }
+
+            .comment-list {
+                order: 6;
+                flex-basis: 100%;
+                margin-top: 8px;
+                gap: 6px;
+            }
+
+            .comment-item {
+                padding: 8px;
+            }
+
+            .notification-actions-bottom {
+                order: 7;
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .notification-actions-inline {
+                order: 4;
+                margin-top: 0;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+                margin-left: auto;
+            }
+
+            .notification-time {
+                white-space: normal;
+            }
+
+            .notification-actors {
+                order: 4;
+                margin-top: 0;
+            }
+
+            .notification-checkbox {
+                order: 3;
+                margin-left: auto;
+            }
+        }
+    </style>
 </head>
 <body>
     <header class="app-header">
@@ -35,6 +121,9 @@
                 </button>
                 <button id="full-sync-btn" class="btn" type="button">
                     Full Sync
+                </button>
+                <button id="force-refresh-btn" class="btn btn-small" type="button">
+                    Force refresh
                 </button>
                 <span id="auth-status" class="auth-status">Checking auth...</span>
             </div>
@@ -287,7 +376,32 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
-    <script src="notifications-comments.js"></script>
-    <script src="notifications.js"></script>
+    <script>
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const cacheBust = params.get('cache_bust') || localStorage.getItem('ghnotif_cache_bust');
+            if (cacheBust) {
+                localStorage.setItem('ghnotif_cache_bust', cacheBust);
+            }
+            const bust = cacheBust ? `?v=${encodeURIComponent(cacheBust)}` : '';
+            document.write(`<script src="notifications-comments.js${bust}"><\/script>`);
+            document.write(`<script src="notifications.js${bust}"><\/script>`);
+        })();
+    </script>
+    <script>
+        (function () {
+            const forceRefreshBtn = document.getElementById('force-refresh-btn');
+            if (!forceRefreshBtn) {
+                return;
+            }
+            forceRefreshBtn.addEventListener('click', () => {
+                const cacheBust = Date.now().toString();
+                localStorage.setItem('ghnotif_cache_bust', cacheBust);
+                const url = new URL(window.location.href);
+                url.searchParams.set('cache_bust', cacheBust);
+                window.location.replace(url.toString());
+            });
+        })();
+    </script>
 </body>
 </html>
