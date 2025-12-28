@@ -481,6 +481,7 @@
             state.notifications = [];
             state.selected.clear();
             state.authenticity_token = null;
+            persistAuthenticityToken(null);
             clearUndoState();
             render();
 
@@ -519,6 +520,7 @@
                     // Store authenticity_token from first page (valid for the session)
                     if (data.authenticity_token && !state.authenticity_token) {
                         state.authenticity_token = data.authenticity_token;
+                        persistAuthenticityToken(data.authenticity_token);
                     }
                     afterCursor = data.pagination.has_next ? data.pagination.after_cursor : null;
                     if (previousMatchMap && overlapIndex === null) {

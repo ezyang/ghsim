@@ -38,6 +38,19 @@
             line-height: 1.5;
         }
 
+        .comment-body details.collapsed-versions {
+            margin: 8px 0;
+        }
+
+        .comment-body details.collapsed-versions summary {
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .comment-body details.collapsed-versions[open] summary {
+            margin-bottom: 4px;
+        }
+
         @media (max-width: 640px) {
             .notifications-container {
                 overflow-x: hidden;
@@ -422,6 +435,62 @@
             document.write(`<script src="notifications-actions.js${bust}"><\/script>`);
             document.write(`<script src="notifications-ui.js${bust}"><\/script>`);
             document.write(`<script src="notifications.js${bust}"><\/script>`);
+        })();
+    </script>
+    <script>
+        (function () {
+            function collapseVersionsSection(markdown) {
+                const text = String(markdown ?? '');
+                const lines = text.split('\n');
+                const output = [];
+                let changed = false;
+                let i = 0;
+                while (i < lines.length) {
+                    const line = lines[i];
+                    const match = line.match(/^(#{1,6})\s+Versions\s*$/i);
+                    if (!match) {
+                        output.push(line);
+                        i += 1;
+                        continue;
+                    }
+                    const level = match[1].length;
+                    let j = i + 1;
+                    while (j < lines.length) {
+                        const headingMatch = lines[j].match(/^(#{1,6})\s+.+$/);
+                        if (headingMatch && headingMatch[1].length <= level) {
+                            break;
+                        }
+                        j += 1;
+                    }
+                    const sectionLines = lines.slice(i + 1, j);
+                    output.push('<details class="collapsed-versions">');
+                    output.push('<summary>Versions</summary>');
+                    if (sectionLines.length > 0) {
+                        output.push('');
+                        output.push(...sectionLines);
+                    }
+                    output.push('</details>');
+                    changed = true;
+                    i = j;
+                }
+                return changed ? output.join('\n') : text;
+            }
+
+            function wrapRenderMarkdown() {
+                if (typeof renderMarkdown !== 'function') {
+                    return;
+                }
+                const original = renderMarkdown;
+                window.renderMarkdown = function (text) {
+                    return original(collapseVersionsSection(text));
+                };
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', wrapRenderMarkdown);
+            } else {
+                wrapRenderMarkdown();
+            }
         })();
     </script>
     <script>

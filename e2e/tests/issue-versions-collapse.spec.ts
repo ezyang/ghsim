@@ -12,11 +12,11 @@ const notificationsResponse = {
     {
       id: 'thread-1',
       unread: true,
-      reason: 'comment',
+      reason: 'subscribed',
       updated_at: '2025-01-02T00:00:00Z',
       last_read_at: '2025-01-01T00:00:00Z',
       subject: {
-        title: 'No new comments should be uninteresting',
+        title: 'Versioned issue',
         url: 'https://github.com/test/repo/issues/1',
         type: 'Issue',
         number: 1,
@@ -35,8 +35,7 @@ const notificationsResponse = {
   },
 };
 
-// Skip: Uninteresting filter was removed in the view-based filtering refactor
-test.describe.skip('Uninteresting without new comments', () => {
+test.describe('Issue versions section', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/github/rest/user', (route) => {
       route.fulfill({
@@ -72,15 +71,34 @@ test.describe.skip('Uninteresting without new comments', () => {
           notificationUpdatedAt: notificationsResponse.notifications[0].updated_at,
           lastReadAt: notificationsResponse.notifications[0].last_read_at,
           unread: true,
-          allComments: false,
+          allComments: true,
           fetchedAt: new Date().toISOString(),
-          comments: [],
+          comments: [
+            {
+              id: 201,
+              user: { login: 'issue-author' },
+              body: [
+                '# Versions',
+                '',
+                '- 1.2.3',
+                '- 2.0.0',
+                '',
+                '## Notes',
+                '',
+                'Extra context.',
+              ].join('\n'),
+              created_at: '2025-01-01T01:00:00Z',
+              updated_at: '2025-01-01T01:00:00Z',
+            },
+          ],
         },
       },
     };
 
     await page.addInitScript((cache) => {
       localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
+      localStorage.setItem('ghnotif_comment_expand_enabled', 'true');
+      localStorage.setItem('ghnotif_comment_hide_uninteresting', 'false');
       localStorage.setItem('ghnotif_bulk_comment_cache_v1', JSON.stringify(cache));
     }, commentCache);
 
@@ -91,35 +109,11 @@ test.describe.skip('Uninteresting without new comments', () => {
     await expect(page.locator('#status-bar')).toContainText('Synced');
   });
 
-  test('treats notifications with no new comments as uninteresting', async ({ page }) => {
-    await expect(page.locator('#count-uninteresting')).toHaveText('1');
-    await expect(page.locator('.comment-tag.uninteresting')).toHaveText(
-      'Uninteresting (0)'
-    );
-
-    await page.locator('#filter-uninteresting').click();
-    await expect(page.locator('.notification-item')).toHaveCount(1);
-    await expect(page.locator('[data-id="thread-1"]')).toBeVisible();
-  });
-
-  test('Mark all button appears in Uninteresting tab and marks done', async ({ page }) => {
-    const apiCalls: string[] = [];
-
-    await page.route('**/github/rest/notifications/threads/**', (route) => {
-      apiCalls.push(route.request().url());
-      route.fulfill({ status: 204 });
-    });
-
-    await page.locator('#filter-uninteresting').click();
-
-    const markDoneBtn = page.locator('#mark-done-btn');
-    await expect(markDoneBtn).toBeVisible();
-    await expect(markDoneBtn).toHaveText('Mark all as Done');
-
-    await markDoneBtn.click();
-
-    await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
-    expect(apiCalls.length).toBe(1);
-    expect(apiCalls[0]).toContain('thread-1');
+  test('collapses versions section by default', async ({ page }) => {
+    const details = page.locator('.comment-body details.collapsed-versions');
+    await expect(details).toHaveCount(1);
+    await expect(details.locator('summary')).toHaveText('Versions');
+    await expect(details).toHaveJSProperty('open', false);
+    await expect(details).toContainText('1.2.3');
   });
 });

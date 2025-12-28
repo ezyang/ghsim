@@ -163,7 +163,7 @@ test.describe('Triage queues', () => {
       .locator('[data-id="thread-pr-2"] .notification-actions-inline .notification-unsubscribe-btn')
       .click();
     await expect(page.locator('#status-bar')).toContainText(
-      'Unsubscribed and marked 1 notification as done'
+      'Done 1/1 (0 pending)'
     );
     await expect(page.locator('[data-id="thread-pr-2"]')).not.toBeAttached();
     expect(unsubscribeCalled).toBe(true);
@@ -202,7 +202,7 @@ test.describe('Triage queues', () => {
     await bottomUnsubscribeButton.click();
 
     await expect(page.locator('#status-bar')).toContainText(
-      'Unsubscribed and marked 1 notification as done'
+      'Done 1/1 (0 pending)'
     );
     await expect(page.locator('[data-id="thread-pr-2"]')).not.toBeAttached();
     expect(unsubscribeCalled).toBe(true);

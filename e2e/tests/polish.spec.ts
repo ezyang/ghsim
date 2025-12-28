@@ -196,7 +196,7 @@ test.describe('Polish', () => {
       await page.locator('#mark-done-btn').click();
 
       // Should complete without dialog
-      await expect(page.locator('#status-bar')).toContainText('Marked 2 notifications as done');
+      await expect(page.locator('#status-bar')).toContainText('Done 2/2 (0 pending)');
     });
 
     test('confirmation appears for 10+ items', async ({ page }) => {
@@ -242,7 +242,7 @@ test.describe('Polish', () => {
       await page.locator('#mark-done-btn').click();
 
       // Should complete after accepting dialog
-      await expect(page.locator('#status-bar')).toContainText('Marked 15 notifications as done');
+      await expect(page.locator('#status-bar')).toContainText('Done 15/15 (0 pending)');
     });
 
     test('cancelling confirmation prevents Mark Done', async ({ page }) => {
@@ -317,7 +317,7 @@ test.describe('Polish', () => {
       }
 
       // Wait for completion
-      await expect(page.locator('#status-bar')).toContainText('Marked');
+      await expect(page.locator('#status-bar')).toContainText('Done');
     });
 
     test('checkboxes are re-enabled after Mark Done completes', async ({ page }) => {
@@ -332,7 +332,7 @@ test.describe('Polish', () => {
       await page.locator('#mark-done-btn').click();
 
       // Wait for completion
-      await expect(page.locator('#status-bar')).toContainText('Marked');
+      await expect(page.locator('#status-bar')).toContainText('Done');
 
       // Remaining checkboxes should be enabled
       const checkboxes = page.locator('.notification-item .notification-checkbox');

@@ -121,6 +121,35 @@
             return { ids: [], show: false };
         }
 
+        function updateDoneSnapshotStatus() {
+            const pending = state.doneSnapshot.pending;
+            const done = state.doneSnapshot.done;
+            const total = pending + done;
+            if (total === 0) {
+                return;
+            }
+            if (elements.statusBar.classList.contains('error')) {
+                return;
+            }
+            showStatus(`Done ${done}/${total} (${pending} pending)`, 'success');
+        }
+
+        function queueDoneSnapshot(count) {
+            state.doneSnapshot.pending += count;
+            updateDoneSnapshotStatus();
+        }
+
+        function resolveDoneSnapshot(success, options = {}) {
+            state.doneSnapshot.pending = Math.max(0, state.doneSnapshot.pending - 1);
+            if (success) {
+                state.doneSnapshot.done += 1;
+            }
+            if (options.suppressStatus) {
+                return;
+            }
+            updateDoneSnapshotStatus();
+        }
+
         async function handleMarkDone() {
             if (state.markingInProgress) return;
 
@@ -173,6 +202,7 @@
 
             const successfulIds = [];
             const failedResults = []; // Store {id, error} for detailed reporting
+            const queuedDoneIds = new Set();
             let rateLimitDelay = 0;
 
             for (let i = 0; i < selectedIds.length; i++) {
@@ -187,6 +217,10 @@
                 }
 
                 try {
+                    if (!queuedDoneIds.has(notifId)) {
+                        queueDoneSnapshot(1);
+                        queuedDoneIds.add(notifId);
+                    }
                     const result = await markNotificationDone(notifId);
 
                     if (result.rateLimited) {
@@ -199,15 +233,18 @@
 
                     if (result.success) {
                         successfulIds.push(notifId);
+                        resolveDoneSnapshot(true);
                     } else {
                         const errorDetail = result.error || `HTTP ${result.status || 'unknown'}`;
                         console.error(`[MarkDone] Failed for ${notifId}:`, errorDetail);
                         failedResults.push({ id: notifId, error: errorDetail });
+                        resolveDoneSnapshot(false);
                     }
                 } catch (e) {
                     const errorDetail = e.message || String(e);
                     console.error(`[MarkDone] Exception for ${notifId}:`, e);
                     failedResults.push({ id: notifId, error: errorDetail });
+                    resolveDoneSnapshot(false);
                 }
 
                 // Small delay between requests to avoid rate limiting
@@ -234,7 +271,7 @@
 
             // Show result message with details
             if (failedResults.length === 0) {
-                showStatus(`Marked ${successfulIds.length} notification${successfulIds.length !== 1 ? 's' : ''} as done`, 'success');
+                updateDoneSnapshotStatus();
             } else if (successfulIds.length === 0) {
                 // All failed - show first error for context
                 const firstError = failedResults[0].error;
@@ -313,10 +350,16 @@
 
                     if (result.success) {
                         // Also mark as done after unsubscribing
+                        queueDoneSnapshot(1);
                         const markDoneResult = await markNotificationDone(notifId);
                         if (markDoneResult.rateLimited) {
                             rateLimitDelay = markDoneResult.retryAfter || 60000;
                             showStatus(`Rate limited. Waiting ${Math.ceil(rateLimitDelay / 1000)}s...`, 'info');
+                            resolveDoneSnapshot(false);
+                        } else if (!markDoneResult.success) {
+                            resolveDoneSnapshot(false);
+                        } else {
+                            resolveDoneSnapshot(true);
                         }
                         successfulIds.push(notifId);
                     } else {
@@ -542,10 +585,12 @@
             });
 
             try {
+                queueDoneSnapshot(1);
                 const result = await markNotificationDone(notifId);
 
                 if (result.rateLimited) {
                     showStatus('Rate limited. Please try again shortly.', 'info');
+                    resolveDoneSnapshot(false, { suppressStatus: true });
                     if (notificationToRemove) {
                         restoreNotificationsInOrder([notificationToRemove]);
                         if (wasSelected) {
@@ -562,6 +607,7 @@
                 if (!result.success) {
                     const errorDetail = result.error || `HTTP ${result.status || 'unknown'}`;
                     showStatus(`Failed to mark notification: ${errorDetail}`, 'error');
+                    resolveDoneSnapshot(false);
                     if (notificationToRemove) {
                         restoreNotificationsInOrder([notificationToRemove]);
                         if (wasSelected) {
@@ -575,10 +621,11 @@
                     return;
                 }
 
-                showStatus('Marked 1 notification as done', 'success');
+                resolveDoneSnapshot(true);
             } catch (e) {
                 const errorDetail = e.message || String(e);
                 showStatus(`Failed to mark notification: ${errorDetail}`, 'error');
+                resolveDoneSnapshot(false);
                 if (notificationToRemove) {
                     restoreNotificationsInOrder([notificationToRemove]);
                     if (wasSelected) {
@@ -620,18 +667,21 @@
                     return;
                 }
 
+                queueDoneSnapshot(1);
                 const markDoneResult = await markNotificationDone(notifId);
                 if (markDoneResult.rateLimited) {
                     showStatus(
                         'Unsubscribed, but rate limited when marking as done. Please try again shortly.',
                         'info'
                     );
+                    resolveDoneSnapshot(false, { suppressStatus: true });
                 } else if (!markDoneResult.success) {
                     const errorDetail =
                         markDoneResult.error || `HTTP ${markDoneResult.status || 'unknown'}`;
                     showStatus(`Unsubscribed, but failed to mark as done: ${errorDetail}`, 'error');
+                    resolveDoneSnapshot(false);
                 } else {
-                    showStatus('Unsubscribed and marked 1 notification as done', 'success');
+                    resolveDoneSnapshot(true);
                 }
 
                 const filteredBeforeRemoval = getFilteredNotifications();
@@ -729,12 +779,34 @@
             undoEntry.notifications = normalizedNotifications;
         }
 
+        async function parseUndoResponse(response) {
+            let result = null;
+            try {
+                result = await response.json();
+            } catch (e) {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                throw new Error('Invalid response from server');
+            }
+
+            if (!response.ok) {
+                const errorDetail =
+                    result.error || result.detail || `HTTP ${response.status}`;
+                throw new Error(errorDetail);
+            }
+            if (!result || result.status !== 'ok') {
+                throw new Error(result?.error || 'Unknown error');
+            }
+            return result;
+        }
+
         async function handleUndo() {
             if (state.undoStack.length === 0 || state.undoInProgress) {
                 return;
             }
 
-            const undoItem = state.undoStack.pop();
+            const undoItem = state.undoStack[state.undoStack.length - 1];
             if (!undoItem) {
                 return;
             }
@@ -743,6 +815,7 @@
             const elapsed = Date.now() - undoItem.timestamp;
             if (elapsed > 30000) {
                 showStatus('Undo expired. Actions can only be undone within 30 seconds.', 'info');
+                state.undoStack.pop();
                 return;
             }
 
@@ -753,6 +826,7 @@
             }
 
             state.undoInProgress = true;
+            showStatus('Undo in progress...', 'info');
 
             try {
                 const action = undoItem.action === 'done' ? 'unarchive' : 'subscribe';
@@ -767,17 +841,13 @@
                         authenticity_token: state.authenticity_token,
                     }),
                 });
-
-                const result = await response.json();
-
-                if (result.status !== 'ok') {
-                    throw new Error(result.error || 'Unknown error');
-                }
+                await parseUndoResponse(response);
 
                 // Restore notifications to the list in updated_at order
                 restoreNotificationsInOrder(undoItem.notifications);
 
                 persistNotifications();
+                state.undoStack.pop();
                 const restoredCount = undoItem.notifications.length;
                 showStatus(
                     `Undo successful: restored ${restoredCount} notification${restoredCount !== 1 ? 's' : ''}`,
@@ -788,8 +858,6 @@
             } catch (e) {
                 const errorDetail = e.message || String(e);
                 showStatus(`Undo failed: ${errorDetail}`, 'error');
-                // Put the item back on the stack so user can retry
-                state.undoStack.push(undoItem);
             } finally {
                 state.undoInProgress = false;
             }

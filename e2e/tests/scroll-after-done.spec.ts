@@ -234,7 +234,7 @@ test.describe('Scroll After Done', () => {
     await page.locator('[data-id="notif-1"] .notification-done-btn').first().click();
 
     // Wait for the notification to be removed
-    await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+    await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
     await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
 
     // Allow scroll adjustment to complete

@@ -68,7 +68,7 @@ test.describe('Undo', () => {
       const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
       await markDoneResponse;
-      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Press u to undo
@@ -91,7 +91,7 @@ test.describe('Undo', () => {
       const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
       await markDoneResponse;
-      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Focus on repo input and type 'u'
@@ -117,13 +117,13 @@ test.describe('Undo', () => {
       let markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
       await markDoneResponse;
-      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-3"] .notification-done-btn').click();
       await markDoneResponse;
-      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('#status-bar')).toContainText('Done 2/2 (0 pending)');
       await expect(page.locator('.notification-item')).toHaveCount(1);
 
       // Undo should only restore the second one
@@ -153,7 +153,7 @@ test.describe('Undo', () => {
       const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
       await markDoneResponse;
-      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Undo
@@ -176,7 +176,7 @@ test.describe('Undo', () => {
       const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
       await markDoneResponse;
-      await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+      await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       // Check localStorage after mark done
@@ -196,6 +196,30 @@ test.describe('Undo', () => {
         return saved ? JSON.parse(saved) : [];
       });
       expect(savedNotifications.length).toBe(5);
+    });
+  });
+
+  test.describe('Token Persistence', () => {
+    test('undo after reload uses persisted authenticity token', async ({ page }) => {
+      await page.route('**/notifications/html/action', (route) => {
+        const body = route.request().postDataJSON();
+        expect(body.authenticity_token).toBe('test-csrf-token-12345');
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok' }),
+        });
+      });
+
+      await page.reload();
+      await expect(page.locator('.notification-item')).toHaveCount(3);
+
+      const markDoneResponse = page.waitForResponse('**/github/rest/notifications/threads/**');
+      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+      await markDoneResponse;
+
+      await page.keyboard.press('u');
+      await expect(page.locator('#status-bar')).toContainText('Undo successful');
     });
   });
 });

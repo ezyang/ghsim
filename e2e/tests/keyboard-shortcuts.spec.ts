@@ -82,7 +82,7 @@ test.describe('Keyboard Shortcuts', () => {
     await page.keyboard.press('j');
     await page.keyboard.press('e');
 
-    await expect(page.locator('#status-bar')).toContainText('Marked 1 notification as done');
+    await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
     await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
   });
 
@@ -107,7 +107,7 @@ test.describe('Keyboard Shortcuts', () => {
     await page.keyboard.press('m');
 
     await expect(page.locator('#status-bar')).toContainText(
-      'Unsubscribed and marked 1 notification as done'
+      'Done 1/1 (0 pending)'
     );
     await expect(page.locator('[data-id="notif-2"]')).not.toBeAttached();
   });
