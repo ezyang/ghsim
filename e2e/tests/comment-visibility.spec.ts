@@ -166,6 +166,24 @@ test.describe('Comment visibility', () => {
     await expect(popup).toHaveURL('https://github.com/test/repo/issues/1');
     await popup.close();
   });
+
+  test('uses GitHub-sized comment typography with a wider layout', async ({
+    page,
+  }) => {
+    const commentBody = page.locator('.comment-body').first();
+    await expect(commentBody).toBeVisible();
+
+    const fontSize = await commentBody.evaluate((element) => {
+      return window.getComputedStyle(element).fontSize;
+    });
+    expect(fontSize).toBe('14px');
+
+    const container = page.locator('.container');
+    const maxWidth = await container.evaluate((element) => {
+      return window.getComputedStyle(element).maxWidth;
+    });
+    expect(maxWidth).toBe('1200px');
+  });
 });
 
 test.describe('Own comment filtering', () => {

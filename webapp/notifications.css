@@ -679,6 +679,15 @@
             line-height: 1;
         }
 
+        @media (max-width: 640px) {
+            .notification-done-btn-bottom,
+            .notification-unsubscribe-btn-bottom,
+            .notification-open-btn-bottom {
+                font-size: 11px;
+                padding: 5px 8px;
+            }
+        }
+
         /* View tabs (primary navigation: Issues / My PRs / Others' PRs) */
         .view-tabs {
             display: flex;

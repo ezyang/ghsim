@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bulk Notifications Editor</title>
+    <title>ghinbox</title>
     <script>
         (function () {
             const params = new URLSearchParams(window.location.search);
@@ -19,6 +19,25 @@
         })();
     </script>
     <style>
+        .container {
+            max-width: 1200px;
+        }
+
+        .comment-item {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .comment-item .comment-meta {
+            font-size: 12px;
+        }
+
+        .comment-body,
+        .comment-body.markdown-body {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
         @media (max-width: 640px) {
             .notifications-container {
                 overflow-x: hidden;
@@ -96,7 +115,7 @@
 <body>
     <header class="app-header">
         <div class="header-inner">
-            <h1>Bulk Notifications Editor</h1>
+            <h1>ghinbox</h1>
             <div class="header-links">
                 <a class="header-link" href="/app/">All tools</a>
             </div>

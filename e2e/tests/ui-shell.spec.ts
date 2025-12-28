@@ -50,7 +50,7 @@ test.describe('UI Shell', () => {
       await expect(header).toBeVisible();
 
       const title = header.locator('h1');
-      await expect(title).toHaveText('Bulk Notifications Editor');
+      await expect(title).toHaveText('ghinbox');
     });
 
     test('header has dark background (GitHub style)', async ({ page }) => {
@@ -406,7 +406,7 @@ test.describe('Responsive Layout', () => {
     const maxWidth = await container.evaluate((el) =>
       getComputedStyle(el).maxWidth
     );
-    expect(maxWidth).toBe('1012px');
+    expect(maxWidth).toBe('1200px');
   });
 
   test('controls wrap on narrow viewport', async ({ page }) => {
