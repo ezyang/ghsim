@@ -16,7 +16,7 @@
         "state_reason": null,
         "title": "Fix critical bug in authentication",
         "type": "Issue",
-        "url": "https://github.com/test/repo/issues/42"
+        "url": "https://github.com/test/repo/issues/42?notification_referrer_id=NT_test_42"
       },
       "ui": {
         "action_tokens": {
@@ -80,7 +80,7 @@
         "state_reason": "completed",
         "title": "Update documentation for API endpoints",
         "type": "Issue",
-        "url": "https://github.com/test/repo/issues/41"
+        "url": "https://github.com/test/repo/issues/41?notification_referrer_id=NT_test_41"
       },
       "ui": {
         "action_tokens": {
@@ -140,7 +140,7 @@
         "state_reason": "not_planned",
         "title": "Won't fix: Legacy code cleanup",
         "type": "Issue",
-        "url": "https://github.com/test/repo/issues/39"
+        "url": "https://github.com/test/repo/issues/39?notification_referrer_id=NT_test_39"
       },
       "ui": {
         "action_tokens": {

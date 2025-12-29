@@ -4,6 +4,8 @@
         const VIEW_FILTERS_KEY = 'ghnotif_view_filters';
         const AUTH_TOKEN_KEY = 'ghnotif_authenticity_token';
         const ORDER_KEY = 'ghnotif_order';
+        const ORDER_BY_VIEW_KEY = 'ghnotif_order_by_view';
+        const VALID_ORDERS = new Set(['recent', 'size']);
 
         // Default view filters for each view
         const DEFAULT_VIEW_FILTERS = {
@@ -14,6 +16,11 @@
                 author: 'all', // 'all' | 'committer' | 'external'
             },
         };
+        const DEFAULT_VIEW_ORDERS = {
+            'issues': 'recent',
+            'my-prs': 'recent',
+            'others-prs': 'recent',
+        };
 
         // Application state
         const state = {
@@ -23,6 +30,7 @@
             error: null,
             view: 'issues', // 'issues', 'my-prs', 'others-prs'
             viewFilters: JSON.parse(JSON.stringify(DEFAULT_VIEW_FILTERS)),
+            viewOrders: { ...DEFAULT_VIEW_ORDERS },
             orderBy: 'recent',
             selected: new Set(), // Set of selected notification IDs
             activeNotificationId: null, // Keyboard selection cursor
@@ -106,6 +114,20 @@
             return normalized;
         }
 
+        function normalizeViewOrders(raw) {
+            const normalized = { ...DEFAULT_VIEW_ORDERS };
+            if (!raw || typeof raw !== 'object') {
+                return normalized;
+            }
+            ['issues', 'my-prs', 'others-prs'].forEach((view) => {
+                const value = raw[view];
+                if (typeof value === 'string' && VALID_ORDERS.has(value)) {
+                    normalized[view] = value;
+                }
+            });
+            return normalized;
+        }
+
         function persistNotifications() {
             saveNotificationsCache(state.notifications).catch((error) => {
                 console.error('Failed to persist notifications cache:', error);
@@ -177,10 +199,25 @@
                 state.view = savedView;
             }
 
-            const savedOrder = localStorage.getItem(ORDER_KEY);
-            if (savedOrder && ['recent', 'size'].includes(savedOrder)) {
-                state.orderBy = savedOrder;
+            const savedViewOrders = localStorage.getItem(ORDER_BY_VIEW_KEY);
+            if (savedViewOrders) {
+                try {
+                    const parsed = JSON.parse(savedViewOrders);
+                    state.viewOrders = normalizeViewOrders(parsed);
+                } catch (e) {
+                    console.error('Failed to parse saved view orders:', e);
+                }
+            } else {
+                const savedOrder = localStorage.getItem(ORDER_KEY);
+                if (savedOrder && VALID_ORDERS.has(savedOrder)) {
+                    state.viewOrders = {
+                        'issues': savedOrder,
+                        'my-prs': savedOrder,
+                        'others-prs': savedOrder,
+                    };
+                }
             }
+            state.orderBy = state.viewOrders[state.view] || DEFAULT_VIEW_ORDERS[state.view];
             if (elements.orderSelect) {
                 elements.orderSelect.value = state.orderBy;
             }
@@ -230,11 +267,12 @@
             if (elements.orderSelect) {
                 elements.orderSelect.addEventListener('change', (event) => {
                     const nextOrder = event.target.value;
-                    if (!['recent', 'size'].includes(nextOrder)) {
+                    if (!VALID_ORDERS.has(nextOrder)) {
                         return;
                     }
                     state.orderBy = nextOrder;
-                    localStorage.setItem(ORDER_KEY, nextOrder);
+                    state.viewOrders[state.view] = nextOrder;
+                    localStorage.setItem(ORDER_BY_VIEW_KEY, JSON.stringify(state.viewOrders));
                     render();
                 });
             }
@@ -350,6 +388,10 @@
             state.view = view;
             localStorage.setItem(VIEW_KEY, view);
             updateSubfilterVisibility();
+            state.orderBy = state.viewOrders[view] || DEFAULT_VIEW_ORDERS[view];
+            if (elements.orderSelect) {
+                elements.orderSelect.value = state.orderBy;
+            }
 
             // Check if current subfilter requires comment prefetch
             const viewFilters = state.viewFilters[view] || DEFAULT_VIEW_FILTERS[view];

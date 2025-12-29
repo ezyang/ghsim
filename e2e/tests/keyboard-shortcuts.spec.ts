@@ -230,7 +230,9 @@ test.describe('Keyboard Shortcuts', () => {
 
     // Verify new tab was opened with the correct URL
     const newPage = await pagePromise;
-    expect(newPage.url()).toBe('https://github.com/test/repo/issues/42');
+    expect(newPage.url()).toBe(
+      'https://github.com/test/repo/issues/42?notification_referrer_id=NT_test_42'
+    );
   });
 
   test('Enter does nothing when no notification is selected', async ({ page, context }) => {

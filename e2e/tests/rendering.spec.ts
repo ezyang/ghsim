@@ -24,7 +24,7 @@ const testNotifications = {
       updated_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
       subject: {
         title: 'Open issue notification',
-        url: 'https://github.com/test/repo/issues/1',
+        url: 'https://github.com/test/repo/issues/1?notification_referrer_id=NT_render_1',
         type: 'Issue',
         number: 1,
         state: 'open',
@@ -182,6 +182,10 @@ test.describe('Notification Rendering', () => {
       await expect(firstItem.locator('.notification-title')).toHaveAttribute(
         'href',
         /github\.com/
+      );
+      await expect(firstItem.locator('.notification-title')).toHaveAttribute(
+        'href',
+        /notification_referrer_id=NT_render_1/
       );
       await expect(firstItem.locator('.notification-time')).toBeVisible();
 

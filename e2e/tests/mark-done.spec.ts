@@ -275,12 +275,71 @@ test.describe('Mark Done', () => {
         deleteCalled = true;
         route.fulfill({ status: 204 });
       });
+      await page.route(
+        '**/github/rest/repos/test/repo/issues/42/comments**',
+        (route) => {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([
+              {
+                id: 1,
+                user: { login: 'alice' },
+                body: 'New comment',
+                created_at: '2024-12-28T00:00:00Z',
+                updated_at: '2024-12-28T00:00:00Z',
+              },
+            ]),
+          });
+        }
+      );
 
       await page.locator('[data-id="notif-1"] .notification-done-btn').click();
 
       await expect(page.locator('[data-id="notif-1"]')).toHaveCount(1);
       await expect(page.locator('#status-bar')).toContainText('New comments');
       expect(deleteCalled).toBe(false);
+    });
+
+    test('allows marking done when new comments are uninteresting or own', async ({ page }) => {
+      let deleteCalled = false;
+
+      await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ updated_at: '2024-12-28T00:00:00Z' }),
+          });
+          return;
+        }
+        deleteCalled = true;
+        route.fulfill({ status: 204 });
+      });
+      await page.route(
+        '**/github/rest/repos/test/repo/issues/42/comments**',
+        (route) => {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([
+              {
+                id: 1,
+                user: { login: 'testuser' },
+                body: 'My own update',
+                created_at: '2024-12-28T00:00:00Z',
+                updated_at: '2024-12-28T00:00:00Z',
+              },
+            ]),
+          });
+        }
+      );
+
+      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+
+      await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
+      await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
+      expect(deleteCalled).toBe(true);
     });
 
     test('bottom done button removes the notification from the list', async ({ page }) => {

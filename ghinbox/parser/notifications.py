@@ -7,7 +7,7 @@ https://github.com/notifications?query=repo:owner/name
 
 import re
 from datetime import datetime
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urljoin, urlparse
 
 from bs4 import BeautifulSoup, Tag
 
@@ -175,10 +175,9 @@ def _extract_subject(item: Tag) -> Subject:
 
     if link:
         href = link.get("href", "")
-        if isinstance(href, str):
-            # Clean URL - remove query params for the canonical URL
-            parsed = urlparse(href)
-            url = f"https://github.com{parsed.path}"
+        if isinstance(href, str) and href:
+            url = urljoin("https://github.com", href)
+            parsed = urlparse(url)
 
             # Extract number from URL path
             number = _extract_number_from_url(parsed.path)

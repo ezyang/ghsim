@@ -349,11 +349,15 @@ test.describe('Polish', () => {
       await page.locator('#mark-done-btn').click();
 
       // All checkboxes should be disabled
-      const checkboxes = page.locator('.notification-checkbox');
-      const count = await checkboxes.count();
-      for (let i = 0; i < count; i++) {
-        await expect(checkboxes.nth(i)).toBeDisabled();
-      }
+      await expect
+        .poll(async () => {
+          return await page
+            .locator('.notification-checkbox')
+            .evaluateAll((elements) => {
+              return elements.length > 0 && elements.every((el) => el.disabled);
+            });
+        })
+        .toBe(true);
 
       // Wait for completion
       await expect(page.locator('#status-bar')).toContainText('Done');

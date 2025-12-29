@@ -187,48 +187,14 @@
             elements.selectAllCheckbox.disabled = true;
             render();
 
-            const selectedIdSet = new Set(selectedIds);
-            const filteredBeforeRemoval = getFilteredNotifications();
-            const scrollAnchor = captureScrollAnchor(selectedIds, filteredBeforeRemoval);
-            const notificationsToRestoreOnFailure = selectedIds
-                .map(id => notificationLookup.get(id))
-                .filter(Boolean);
-            const notificationsToRestoreById = new Map(
-                notificationsToRestoreOnFailure.map(notification => [notification.id, notification])
-            );
-            const undoEntry = pushToUndoStack('done', notificationsToRestoreOnFailure);
-
-            state.notifications = state.notifications.filter(
-                notif => !selectedIdSet.has(notif.id)
-            );
-
-            // Clear selection for removed items
-            selectedIds.forEach(id => state.selected.delete(id));
-
-            // Update localStorage
-            persistNotifications();
-            render();
-            requestAnimationFrame(() => {
-                restoreScrollAnchor(scrollAnchor);
-            });
-
+            const notificationsToRestoreById = new Map(notificationLookup);
             const successfulIds = [];
-            const failedResults = []; // Store {id, error} for detailed reporting
+            const preflightFailedResults = [];
             const blockedResults = []; // Store {id, reason} when updated comments block completion
-            const queuedDoneIds = new Set();
-            let rateLimitDelay = 0;
+            const allowedIds = [];
 
             for (let i = 0; i < selectedIds.length; i++) {
                 const notifId = selectedIds[i];
-                state.markProgress.current = i + 1;
-                render();
-
-                // If we hit a rate limit, wait before retrying
-                if (rateLimitDelay > 0) {
-                    await sleep(rateLimitDelay);
-                    rateLimitDelay = 0;
-                }
-
                 try {
                     const notification = notificationLookup.get(notifId);
                     const syncResult = await syncNotificationBeforeDone(notifId, notification);
@@ -243,12 +209,77 @@
                         continue;
                     }
                     if (syncResult?.status === 'error') {
-                        failedResults.push({
+                        preflightFailedResults.push({
                             id: notifId,
                             error: syncResult.error || 'Failed to sync notification',
                         });
                         continue;
                     }
+                    allowedIds.push(notifId);
+                } catch (e) {
+                    const errorDetail = e.message || String(e);
+                    preflightFailedResults.push({ id: notifId, error: errorDetail });
+                }
+            }
+
+            if (allowedIds.length === 0) {
+                state.markingInProgress = false;
+                state.markProgress = { current: 0, total: 0 };
+                elements.markDoneBtn.disabled = false;
+                elements.selectAllCheckbox.disabled = false;
+                if (preflightFailedResults.length > 0) {
+                    const firstError = preflightFailedResults[0]?.error || 'Unknown error';
+                    showStatus(`Failed to sync notifications: ${firstError}`, 'error');
+                } else {
+                    showStatus(
+                        `Skipped ${blockedResults.length} notification${blockedResults.length !== 1 ? 's' : ''}: new comments found`,
+                        'info'
+                    );
+                }
+                render();
+                return;
+            }
+
+            state.markProgress = { current: 0, total: allowedIds.length };
+
+            const allowedIdSet = new Set(allowedIds);
+            const filteredBeforeRemoval = getFilteredNotifications();
+            const scrollAnchor = captureScrollAnchor(allowedIds, filteredBeforeRemoval);
+            const notificationsToRestoreOnFailure = allowedIds
+                .map(id => notificationsToRestoreById.get(id))
+                .filter(Boolean);
+            const undoEntry = pushToUndoStack('done', notificationsToRestoreOnFailure);
+
+            state.notifications = state.notifications.filter(
+                notif => !allowedIdSet.has(notif.id)
+            );
+
+            // Clear selection for removed items
+            allowedIds.forEach(id => state.selected.delete(id));
+
+            // Update localStorage
+            persistNotifications();
+            render();
+            requestAnimationFrame(() => {
+                restoreScrollAnchor(scrollAnchor);
+            });
+
+            const failedResults = []; // Store {id, error} for detailed reporting
+            const queuedDoneIds = new Set();
+            let rateLimitDelay = 0;
+
+            for (let i = 0; i < allowedIds.length; i++) {
+                const notifId = allowedIds[i];
+                state.markProgress.current = i + 1;
+                render();
+
+                // If we hit a rate limit, wait before retrying
+                if (rateLimitDelay > 0) {
+                    await sleep(rateLimitDelay);
+                    rateLimitDelay = 0;
+                }
+
+                try {
                     if (!queuedDoneIds.has(notifId)) {
                         queueDoneSnapshot(1);
                         queuedDoneIds.add(notifId);
@@ -280,18 +311,14 @@
                 }
 
                 // Small delay between requests to avoid rate limiting
-                if (i < selectedIds.length - 1) {
+                if (i < allowedIds.length - 1) {
                     await sleep(100);
                 }
             }
 
-            if (failedResults.length > 0 || blockedResults.length > 0) {
-                const failedIdSet = new Set([
-                    ...failedResults.map(result => result.id),
-                    ...blockedResults.map(result => result.id),
-                ]);
-                const failedNotifications = Array.from(failedIdSet)
-                    .map(id => notificationsToRestoreById.get(id))
+            if (failedResults.length > 0) {
+                const failedNotifications = failedResults
+                    .map(result => notificationsToRestoreById.get(result.id))
                     .filter(Boolean);
                 restoreNotificationsInOrder(failedNotifications);
                 failedNotifications.forEach(notification => state.selected.add(notification.id));
@@ -305,37 +332,38 @@
             elements.selectAllCheckbox.disabled = false;
 
             // Show result message with details
-            if (failedResults.length === 0 && blockedResults.length === 0) {
+            const allFailedResults = [...preflightFailedResults, ...failedResults];
+            if (allFailedResults.length === 0 && blockedResults.length === 0) {
                 updateDoneSnapshotStatus();
-            } else if (successfulIds.length === 0 && failedResults.length === 0) {
+            } else if (successfulIds.length === 0 && allFailedResults.length === 0) {
                 showStatus(
                     `Skipped ${blockedResults.length} notification${blockedResults.length !== 1 ? 's' : ''}: new comments found`,
                     'info'
                 );
             } else if (successfulIds.length === 0) {
                 // All failed - show first error for context
-                const firstError = failedResults[0]?.error || 'Unknown error';
+                const firstError = allFailedResults[0]?.error || 'Unknown error';
                 const blockedSuffix = blockedResults.length
                     ? ` (${blockedResults.length} skipped for new comments)`
                     : '';
                 showStatus(`Failed to mark notifications: ${firstError}${blockedSuffix}`, 'error');
-                console.error('[MarkDone] All failed. Errors:', failedResults);
-            } else if (failedResults.length === 0) {
+                console.error('[MarkDone] All failed. Errors:', allFailedResults);
+            } else if (allFailedResults.length === 0) {
                 showStatus(
                     `Marked ${successfulIds.length} done, ${blockedResults.length} skipped (new comments)`,
                     'info'
                 );
             } else {
                 // Partial failure
-                const firstError = failedResults[0]?.error || 'Unknown error';
+                const firstError = allFailedResults[0]?.error || 'Unknown error';
                 const blockedSuffix = blockedResults.length
                     ? `, ${blockedResults.length} skipped (new comments)`
                     : '';
                 showStatus(
-                    `Marked ${successfulIds.length} done, ${failedResults.length} failed${blockedSuffix}: ${firstError}`,
+                    `Marked ${successfulIds.length} done, ${allFailedResults.length} failed${blockedSuffix}: ${firstError}`,
                     'error'
                 );
-                console.error('[MarkDone] Partial failure. Errors:', failedResults);
+                console.error('[MarkDone] Partial failure. Errors:', allFailedResults);
             }
 
             const notificationsForUndo = successfulIds
@@ -609,6 +637,25 @@
                     }
                     : null;
 
+                const commentCheck = await hasNewCommentsSince(notification, localUpdatedAt);
+                if (!commentCheck || commentCheck.status !== 'ok') {
+                    return {
+                        status: 'error',
+                        error: commentCheck?.error || 'Unable to verify new comments for this notification.',
+                    };
+                }
+
+                if (!commentCheck.hasNew || commentCheck.allowDone) {
+                    if (updatedNotification) {
+                        const index = state.notifications.findIndex(n => n.id === updatedNotification.id);
+                        if (index !== -1) {
+                            state.notifications[index] = updatedNotification;
+                            persistNotifications();
+                        }
+                    }
+                    return { status: 'ok', updatedNotification };
+                }
+
                 if (updatedNotification) {
                     const index = state.notifications.findIndex(n => n.id === updatedNotification.id);
                     if (index !== -1) {
@@ -631,6 +678,54 @@
                 };
             } catch (error) {
                 return { status: 'error', error: error.message || String(error) };
+            }
+        }
+
+        async function hasNewCommentsSince(notification, since) {
+            if (!since) {
+                return {
+                    status: 'error',
+                    error: 'Missing timestamp for comment check.',
+                };
+            }
+            const repo = parseRepoInput(state.repo || '');
+            const issueNumber = getIssueNumber(notification);
+            if (!repo || !issueNumber) {
+                return {
+                    status: 'error',
+                    error: 'Missing repository or issue number.',
+                };
+            }
+            try {
+                let commentUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/issues/${issueNumber}/comments`;
+                commentUrl += `?since=${encodeURIComponent(since)}`;
+                const comments = await fetchJson(commentUrl);
+                if (!Array.isArray(comments)) {
+                    return {
+                        status: 'error',
+                        error: 'Unexpected comment response.',
+                    };
+                }
+                if (comments.length === 0) {
+                    return { status: 'ok', hasNew: false, allowDone: true };
+                }
+                const currentUser = String(state.currentUserLogin || '').toLowerCase();
+                const allowDone = comments.every((comment) => {
+                    const author = String(comment?.user?.login || '').toLowerCase();
+                    const isOwn = Boolean(currentUser) && author === currentUser;
+                    const isUninteresting =
+                        typeof isUninterestingComment === 'function'
+                            ? isUninterestingComment(comment)
+                            : false;
+                    return isOwn || isUninteresting;
+                });
+                return { status: 'ok', hasNew: true, allowDone };
+            } catch (error) {
+                console.error('[MarkDone] Comment sync failed:', error);
+                return {
+                    status: 'error',
+                    error: error.message || String(error),
+                };
             }
         }
 

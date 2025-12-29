@@ -599,10 +599,20 @@
 
                 let notifications = sortedNotifications;
                 if (state.commentPrefetchEnabled) {
+                    const restLookupKeys =
+                        syncMode === 'incremental' && overlapIndex !== null && previousMatchMap
+                            ? buildIncrementalRestLookupKeys(allNotifications, previousMatchMap)
+                            : null;
                     const missingCount = countMissingLastReadAt(sortedNotifications);
+                    const restMissingCount = countMissingLastReadAtForKeys(
+                        sortedNotifications,
+                        restLookupKeys
+                    );
                     if (missingCount > 0) {
                         showStatus(
-                            `${syncLabel}: fetching last_read_at for ${missingCount} notifications`,
+                            restLookupKeys && restMissingCount !== missingCount
+                                ? `${syncLabel}: fetching last_read_at for ${restMissingCount}/${missingCount} notifications`
+                                : `${syncLabel}: fetching last_read_at for ${missingCount} notifications`,
                             'info',
                             { flash: true }
                         );
@@ -612,7 +622,9 @@
                             'info'
                         );
                     }
-                    notifications = await ensureLastReadAtData(sortedNotifications);
+                    notifications = await ensureLastReadAtData(sortedNotifications, {
+                        restLookupKeys,
+                    });
                     const remainingMissing = countMissingLastReadAt(notifications);
                     const filledCount = Math.max(missingCount - remainingMissing, 0);
                     if (missingCount > 0) {

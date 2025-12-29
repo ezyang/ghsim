@@ -105,6 +105,14 @@
             display: none;
         }
 
+        .notification-item:has(.comment-list) .notification-header,
+        .notification-item:has(.comment-list) .notification-checkbox,
+        .notification-item:has(.comment-list) .notification-icon,
+        .notification-item:has(.comment-list) .notification-actors,
+        .notification-item:has(.comment-list) .notification-actions-inline {
+            background-color: var(--color-bg-subtle);
+        }
+
         @media (max-width: 640px) {
             .notifications-container {
                 overflow-x: hidden;
@@ -493,10 +501,17 @@
             const VIEW_KEY = 'ghnotif_view';
             const VIEW_FILTERS_KEY = 'ghnotif_view_filters';
             const REPO_KEY = 'ghnotif_repo';
+            const ORDER_KEY = 'ghnotif_order';
+            const ORDER_BY_VIEW_KEY = 'ghnotif_order_by_view';
             const DEFAULT_VIEW_FILTERS = {
                 'issues': { state: 'all' },
                 'my-prs': { state: 'all' },
                 'others-prs': { state: 'all', author: 'all' },
+            };
+            const DEFAULT_VIEW_ORDERS = {
+                'issues': 'recent',
+                'my-prs': 'recent',
+                'others-prs': 'recent',
             };
             const VALID_VIEWS = new Set(['issues', 'my-prs', 'others-prs']);
             const VALID_STATE_BY_VIEW = {
@@ -505,6 +520,16 @@
                 'others-prs': new Set(['all', 'needs-review', 'approved', 'draft', 'closed']),
             };
             const VALID_AUTHOR = new Set(['all', 'committer', 'external']);
+            const VALID_ORDERS = new Set(['recent', 'size']);
+            const VIEW_QUERY_KEYS = {
+                'issues': { state: 'issues_state', order: 'issues_order' },
+                'my-prs': { state: 'my_prs_state', order: 'my_prs_order' },
+                'others-prs': {
+                    state: 'others_prs_state',
+                    author: 'others_prs_author',
+                    order: 'others_prs_order',
+                },
+            };
 
             function cloneDefaults() {
                 return JSON.parse(JSON.stringify(DEFAULT_VIEW_FILTERS));
@@ -531,6 +556,24 @@
                 return normalized;
             }
 
+            function cloneDefaultOrders() {
+                return { ...DEFAULT_VIEW_ORDERS };
+            }
+
+            function normalizeOrders(raw) {
+                const normalized = cloneDefaultOrders();
+                if (!raw || typeof raw !== 'object') {
+                    return normalized;
+                }
+                ['issues', 'my-prs', 'others-prs'].forEach((view) => {
+                    const value = raw[view];
+                    if (typeof value === 'string' && VALID_ORDERS.has(value)) {
+                        normalized[view] = value;
+                    }
+                });
+                return normalized;
+            }
+
             function readStoredFilters() {
                 const raw = localStorage.getItem(VIEW_FILTERS_KEY);
                 if (!raw) {
@@ -543,6 +586,26 @@
                 }
             }
 
+            function readStoredOrders() {
+                const raw = localStorage.getItem(ORDER_BY_VIEW_KEY);
+                if (raw) {
+                    try {
+                        return normalizeOrders(JSON.parse(raw));
+                    } catch (error) {
+                        return cloneDefaultOrders();
+                    }
+                }
+                const legacy = localStorage.getItem(ORDER_KEY);
+                if (legacy && VALID_ORDERS.has(legacy)) {
+                    return {
+                        'issues': legacy,
+                        'my-prs': legacy,
+                        'others-prs': legacy,
+                    };
+                }
+                return cloneDefaultOrders();
+            }
+
             function getStoredView() {
                 const view = localStorage.getItem(VIEW_KEY);
                 return VALID_VIEWS.has(view) ? view : 'issues';
@@ -553,7 +616,7 @@
                 const view = getStoredView();
                 const repo = (localStorage.getItem(REPO_KEY) || '').trim();
                 const filters = readStoredFilters();
-                const viewFilters = filters[view] || DEFAULT_VIEW_FILTERS[view];
+                const orders = readStoredOrders();
 
                 params.set('view', view);
                 if (repo) {
@@ -562,25 +625,21 @@
                     params.delete('repo');
                 }
 
-                const stateFilter = viewFilters.state || 'all';
-                const authorFilter = viewFilters.author || 'all';
-                if (view === 'issues' && stateFilter !== 'all') {
-                    params.set('state', stateFilter);
-                } else if (view === 'others-prs') {
-                    if (stateFilter !== 'all') {
-                        params.set('state', stateFilter);
-                    } else {
-                        params.delete('state');
+                params.delete('state');
+                params.delete('author');
+
+                Object.keys(VIEW_QUERY_KEYS).forEach((viewName) => {
+                    const config = VIEW_QUERY_KEYS[viewName];
+                    const filtersForView = filters[viewName] || DEFAULT_VIEW_FILTERS[viewName];
+                    const stateFilter = filtersForView.state || 'all';
+                    const authorFilter = filtersForView.author || 'all';
+                    const orderValue = orders[viewName] || DEFAULT_VIEW_ORDERS[viewName];
+                    params.set(config.state, stateFilter);
+                    if (config.author) {
+                        params.set(config.author, authorFilter);
                     }
-                    if (authorFilter !== 'all') {
-                        params.set('author', authorFilter);
-                    } else {
-                        params.delete('author');
-                    }
-                } else {
-                    params.delete('state');
-                    params.delete('author');
-                }
+                    params.set(config.order, orderValue);
+                });
 
                 const next = params.toString();
                 const url = next ? `${window.location.pathname}?${next}` : window.location.pathname;
@@ -600,16 +659,47 @@
 
                 if (view && VALID_VIEWS.has(view)) {
                     localStorage.setItem(VIEW_KEY, view);
-                    const filters = cloneDefaults();
-                    const stateFilter = params.get('state');
-                    const authorFilter = params.get('author');
-                    if (stateFilter && VALID_STATE_BY_VIEW[view]?.has(stateFilter)) {
-                        filters[view].state = stateFilter;
+                    applied = true;
+                }
+
+                const filters = cloneDefaults();
+                const orders = cloneDefaultOrders();
+                let hasFilterParams = false;
+                let hasOrderParams = false;
+                const legacyState = params.get('state');
+                const legacyAuthor = params.get('author');
+
+                Object.keys(VIEW_QUERY_KEYS).forEach((viewName) => {
+                    const config = VIEW_QUERY_KEYS[viewName];
+                    const stateParam = params.get(config.state) ||
+                        (viewName === view ? legacyState : null);
+                    if (stateParam && VALID_STATE_BY_VIEW[viewName]?.has(stateParam)) {
+                        filters[viewName].state = stateParam;
+                        hasFilterParams = true;
                     }
-                    if (view === 'others-prs' && authorFilter && VALID_AUTHOR.has(authorFilter)) {
-                        filters[view].author = authorFilter;
+
+                    if (config.author) {
+                        const authorParam = params.get(config.author) ||
+                            (viewName === view ? legacyAuthor : null);
+                        if (authorParam && VALID_AUTHOR.has(authorParam)) {
+                            filters[viewName].author = authorParam;
+                            hasFilterParams = true;
+                        }
                     }
+
+                    const orderParam = params.get(config.order);
+                    if (orderParam && VALID_ORDERS.has(orderParam)) {
+                        orders[viewName] = orderParam;
+                        hasOrderParams = true;
+                    }
+                });
+
+                if (hasFilterParams) {
                     localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(filters));
+                    applied = true;
+                }
+                if (hasOrderParams) {
+                    localStorage.setItem(ORDER_BY_VIEW_KEY, JSON.stringify(orders));
                     applied = true;
                 }
 
@@ -631,6 +721,10 @@
             const repoInput = document.getElementById('repo-input');
             if (repoInput) {
                 repoInput.addEventListener('input', scheduleQueryUpdate);
+            }
+            const orderSelect = document.getElementById('order-select');
+            if (orderSelect) {
+                orderSelect.addEventListener('change', scheduleQueryUpdate);
             }
 
         })();

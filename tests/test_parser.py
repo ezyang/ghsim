@@ -154,7 +154,7 @@ class TestParseNotificationsHtml:
         assert actor.avatar_url != ""
 
     def test_extracts_subject_url(self, pagination_page1_html: str) -> None:
-        """Test that subject URLs are properly extracted and cleaned."""
+        """Test that subject URLs are properly extracted and preserved."""
         result = parse_notifications_html(
             html=pagination_page1_html,
             owner="ezyang0",
@@ -163,8 +163,8 @@ class TestParseNotificationsHtml:
 
         first = result.notifications[0]
 
-        # URL should be cleaned (no query params)
-        assert "?" not in first.subject.url
+        # URL should preserve query params from the HTML.
+        assert "?foo=bar" in first.subject.url
         assert first.subject.url.startswith("https://github.com/")
         assert "/issues/" in first.subject.url or "/pull/" in first.subject.url
 

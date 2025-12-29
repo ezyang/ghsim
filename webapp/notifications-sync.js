@@ -72,14 +72,18 @@
             return typeof number === 'number' ? number : null;
         }
 
-        function getNotificationMatchKey(notification) {
-            const repo = parseRepoInput(state.repo || '');
+        function getNotificationMatchKeyForRepo(notification, repo) {
             const number = notification?.subject?.number;
             const type = notification?.subject?.type || 'unknown';
             if (repo && typeof number === 'number') {
                 return `${repo.owner}/${repo.repo}:${type}:${number}`;
             }
             return `id:${getNotificationKey(notification)}`;
+        }
+
+        function getNotificationMatchKey(notification) {
+            const repo = parseRepoInput(state.repo || '');
+            return getNotificationMatchKeyForRepo(notification, repo);
         }
 
         function getNotificationDedupKey(notification) {
@@ -109,6 +113,23 @@
             return notifications.filter((notif) => !notif.last_read_at).length;
         }
 
+        function countMissingLastReadAtForKeys(notifications, restLookupKeys) {
+            if (!restLookupKeys) {
+                return countMissingLastReadAt(notifications);
+            }
+            let count = 0;
+            notifications.forEach((notif) => {
+                if (notif.last_read_at) {
+                    return;
+                }
+                const key = getNotificationMatchKey(notif);
+                if (key && restLookupKeys.has(key)) {
+                    count += 1;
+                }
+            });
+            return count;
+        }
+
         function buildPreviousMatchMap(notifications) {
             const map = new Map();
             notifications.forEach((notif, index) => {
@@ -119,6 +140,35 @@
                 map.set(key, { updatedAt: getUpdatedAtSignature(notif.updated_at), index });
             });
             return map;
+        }
+
+        function buildNotificationMatchKeySet(notifications, repo = null) {
+            const keys = new Set();
+            notifications.forEach((notif) => {
+                const key = repo
+                    ? getNotificationMatchKeyForRepo(notif, repo)
+                    : getNotificationMatchKey(notif);
+                if (key) {
+                    keys.add(key);
+                }
+            });
+            return keys;
+        }
+
+        function buildIncrementalRestLookupKeys(notifications, previousMatchMap) {
+            const keys = new Set();
+            notifications.forEach((notif) => {
+                const key = getNotificationMatchKey(notif);
+                if (!key) {
+                    return;
+                }
+                const previous = previousMatchMap.get(key);
+                if (previous && previous.updatedAt === getUpdatedAtSignature(notif.updated_at)) {
+                    return;
+                }
+                keys.add(key);
+            });
+            return keys;
         }
 
         function findIncrementalOverlapIndex(notifications, previousMatchMap) {
@@ -226,7 +276,7 @@
             return result;
         }
 
-        async function ensureLastReadAtData(notifications) {
+        async function ensureLastReadAtData(notifications, { restLookupKeys = null } = {}) {
             const missing = notifications.filter((notif) => !notif.last_read_at);
             if (!missing.length) {
                 return notifications;
@@ -249,9 +299,13 @@
                     return;
                 }
                 const key = getNotificationMatchKey(notif);
-                if (key) {
-                    missingKeys.add(key);
+                if (!key) {
+                    return;
                 }
+                if (restLookupKeys && !restLookupKeys.has(key)) {
+                    return;
+                }
+                missingKeys.add(key);
             });
             const restMap =
                 missingKeys.size > 0
@@ -278,6 +332,162 @@
             });
             await refreshRateLimit();
             return mergedNotifications;
+        }
+
+        function buildPullRequestStateQuery(issueNumbers) {
+            const fields = issueNumbers
+                .map((issueNumber) => `pr${issueNumber}: pullRequest(number: ${issueNumber}) { state isDraft }`)
+                .join('\n');
+            return `
+                query($owner: String!, $name: String!) {
+                    rateLimit {
+                        limit
+                        remaining
+                        resetAt
+                    }
+                    repository(owner: $owner, name: $name) {
+                        ${fields}
+                    }
+                }
+            `;
+        }
+
+        function normalizePullRequestState(state, isDraft) {
+            if (state === 'MERGED') {
+                return 'merged';
+            }
+            if (state === 'CLOSED') {
+                return 'closed';
+            }
+            if (isDraft) {
+                return 'draft';
+            }
+            if (state === 'OPEN') {
+                return 'open';
+            }
+            return null;
+        }
+
+        async function fetchGraphqlForSync(query, variables) {
+            if (typeof fetchGraphql === 'function') {
+                return fetchGraphql(query, variables);
+            }
+            const response = await fetch('/github/graphql', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query, variables }),
+            });
+            if (!response.ok) {
+                const detail = await response.text();
+                throw new Error(`Request failed: /github/graphql (${response.status}) ${detail}`);
+            }
+            const payload = await response.json();
+            if (payload?.data?.rateLimit) {
+                updateGraphqlRateLimit(payload.data.rateLimit);
+            } else if (payload?.extensions?.rateLimit) {
+                updateGraphqlRateLimit(payload.extensions.rateLimit);
+            }
+            if (Array.isArray(payload?.errors) && payload.errors.length) {
+                const messages = payload.errors
+                    .map((error) => error?.message)
+                    .filter(Boolean)
+                    .join('; ');
+                throw new Error(messages || 'GraphQL request failed');
+            }
+            return payload.data;
+        }
+
+        async function refreshPullRequestStates(
+            repo,
+            notifications,
+            {
+                syncLabel = 'Quick Sync',
+                matchKeys = null,
+            } = {}
+        ) {
+            if (!repo || !notifications.length) {
+                return notifications;
+            }
+            const targets = notifications.filter((notif) => {
+                if (notif.subject?.type !== 'PullRequest') {
+                    return false;
+                }
+                if (typeof notif.subject?.number !== 'number') {
+                    return false;
+                }
+                if (matchKeys && !matchKeys.has(getNotificationMatchKeyForRepo(notif, repo))) {
+                    return false;
+                }
+                return true;
+            });
+            if (!targets.length) {
+                return notifications;
+            }
+            const uniqueNumbers = Array.from(
+                new Set(targets.map((notif) => getIssueNumber(notif)).filter(Boolean))
+            );
+            if (!uniqueNumbers.length) {
+                return notifications;
+            }
+            const updates = new Map();
+            try {
+                showStatus(
+                    `${syncLabel}: checking PR state for ${uniqueNumbers.length} notifications`,
+                    'info',
+                    { flash: true }
+                );
+                const batchSize = 25;
+                for (let i = 0; i < uniqueNumbers.length; i += batchSize) {
+                    const batch = uniqueNumbers.slice(i, i + batchSize);
+                    const query = buildPullRequestStateQuery(batch);
+                    const data = await fetchGraphqlForSync(query, {
+                        owner: repo.owner,
+                        name: repo.repo,
+                    });
+                    const repoData = data?.repository || {};
+                    batch.forEach((issueNumber) => {
+                        const entry = repoData[`pr${issueNumber}`];
+                        if (!entry) {
+                            return;
+                        }
+                        const nextState = normalizePullRequestState(entry.state, entry.isDraft);
+                        if (nextState) {
+                            updates.set(issueNumber, nextState);
+                        }
+                    });
+                }
+                setGraphqlRateLimitError(null);
+            } catch (error) {
+                setGraphqlRateLimitError(error.message || String(error));
+                showStatus(
+                    `${syncLabel}: PR state check failed: ${error.message || error}`,
+                    'error'
+                );
+                return notifications;
+            }
+            if (!updates.size) {
+                return notifications;
+            }
+            return notifications.map((notif) => {
+                const number = getIssueNumber(notif);
+                if (!number || notif.subject?.type !== 'PullRequest') {
+                    return notif;
+                }
+                if (matchKeys && !matchKeys.has(getNotificationMatchKeyForRepo(notif, repo))) {
+                    return notif;
+                }
+                const nextState = updates.get(number);
+                if (!nextState || notif.subject.state === nextState) {
+                    return notif;
+                }
+                return {
+                    ...notif,
+                    subject: {
+                        ...notif.subject,
+                        state: nextState,
+                    },
+                };
+            });
         }
         // Check authentication status
         async function checkAuth() {
@@ -320,6 +530,7 @@
             }
 
             const [owner, repoName] = parts;
+            const repoInfo = { owner, repo: repoName };
             const previousNotifications = state.notifications.slice();
             const previousSelected = new Set(state.selected);
             const syncMode = mode === 'full' ? 'full' : 'incremental';
@@ -436,10 +647,20 @@
 
                 let notifications = sortedNotifications;
                 if (state.commentPrefetchEnabled) {
+                    const restLookupKeys =
+                        syncMode === 'incremental' && overlapIndex !== null && previousMatchMap
+                            ? buildIncrementalRestLookupKeys(allNotifications, previousMatchMap)
+                            : null;
                     const missingCount = countMissingLastReadAt(sortedNotifications);
+                    const restMissingCount = countMissingLastReadAtForKeys(
+                        sortedNotifications,
+                        restLookupKeys
+                    );
                     if (missingCount > 0) {
                         showStatus(
-                            `${syncLabel}: fetching last_read_at for ${missingCount} notifications`,
+                            restLookupKeys && restMissingCount !== missingCount
+                                ? `${syncLabel}: fetching last_read_at for ${restMissingCount}/${missingCount} notifications`
+                                : `${syncLabel}: fetching last_read_at for ${missingCount} notifications`,
                             'info',
                             { flash: true }
                         );
@@ -449,7 +670,9 @@
                             'info'
                         );
                     }
-                    notifications = await ensureLastReadAtData(sortedNotifications);
+                    notifications = await ensureLastReadAtData(sortedNotifications, {
+                        restLookupKeys,
+                    });
                     const remainingMissing = countMissingLastReadAt(notifications);
                     const filledCount = Math.max(missingCount - remainingMissing, 0);
                     if (missingCount > 0) {
@@ -458,6 +681,21 @@
                             'info'
                         );
                     }
+                }
+
+                if (syncMode === 'incremental' && overlapIndex !== null) {
+                    const fetchedKeys = buildNotificationMatchKeySet(allNotifications, repoInfo);
+                    const cachedKeys = new Set();
+                    notifications.forEach((notif) => {
+                        const key = getNotificationMatchKeyForRepo(notif, repoInfo);
+                        if (key && !fetchedKeys.has(key)) {
+                            cachedKeys.add(key);
+                        }
+                    });
+                    notifications = await refreshPullRequestStates(repoInfo, notifications, {
+                        syncLabel,
+                        matchKeys: cachedKeys,
+                    });
                 }
 
                 state.notifications = notifications;
