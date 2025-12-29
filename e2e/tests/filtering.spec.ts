@@ -237,6 +237,14 @@ test.describe('Filtering', () => {
       await expect(issuesSubfilters.locator('[data-subfilter="closed"] .count')).toHaveText('2');
     });
 
+    test('hides count on the active subfilter', async ({ page }) => {
+      const issuesSubfilters = page.locator('.subfilter-tabs[data-for-view="issues"]');
+
+      await issuesSubfilters.locator('[data-subfilter="open"]').click();
+      await expect(issuesSubfilters.locator('[data-subfilter="open"] .count')).toHaveText('');
+      await expect(issuesSubfilters.locator('[data-subfilter="closed"] .count')).toHaveText('2');
+    });
+
     test('shows subfilter counts for Others PRs view', async ({ page }) => {
       await page.locator('#view-others-prs').click();
 
@@ -320,9 +328,12 @@ test.describe('Filtering', () => {
       await expect(page.locator('[data-id="notif-2"]')).toBeVisible();
 
       await othersPrsAuthor.locator('[data-subfilter="external"]').click();
+      await expect(othersPrsStatus.locator('[data-subfilter="needs-review"]')).toHaveClass(/active/);
+      await expect(page.locator('.notification-item')).toHaveCount(0);
+
+      await othersPrsStatus.locator('[data-subfilter="needs-review"]').click();
       await expect(page.locator('.notification-item')).toHaveCount(1);
       await expect(page.locator('[data-id="notif-4"]')).toBeVisible();
-      await expect(page.locator('[data-id="notif-2"]')).not.toBeAttached();
     });
   });
 
@@ -368,6 +379,7 @@ test.describe('Filtering', () => {
       // Then switch back to all
       await issuesSubfilters.locator('[data-subfilter="all"]').click();
       await expect(page.locator('.notification-item')).toHaveCount(3);
+      await expect(issuesSubfilters.locator('.subfilter-tab.active')).toHaveCount(0);
     });
 
     test('notification count header updates with subfilter', async ({ page }) => {

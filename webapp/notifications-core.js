@@ -349,16 +349,15 @@
                     ...DEFAULT_VIEW_FILTERS[state.view],
                 };
             }
-            state.viewFilters[state.view][group] = subfilter;
-            if (group === 'author' && state.viewFilters[state.view].state !== 'all') {
-                state.viewFilters[state.view].state = 'all';
-            }
+            const current = state.viewFilters[state.view][group] || 'all';
+            const next = subfilter === current ? 'all' : subfilter;
+            state.viewFilters[state.view][group] = next;
             localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(state.viewFilters));
 
-            if (group === 'state' && subfilter === 'approved' && !state.commentPrefetchEnabled) {
+            if (group === 'state' && next === 'approved' && !state.commentPrefetchEnabled) {
                 showStatus('Enable comment fetching to evaluate triage filters.', 'info');
             }
-            if (group === 'author' && (subfilter === 'committer' || subfilter === 'external')) {
+            if (group === 'author' && (next === 'committer' || next === 'external')) {
                 maybePrefetchReviewMetadata();
             }
             render();

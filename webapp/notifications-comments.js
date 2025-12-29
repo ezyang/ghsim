@@ -587,6 +587,7 @@ function isBotAuthor(login) {
         'bors',
         'homu',
         'mergify',
+        'pytorchbot',
         'htmlpurifierbot',
         'github-actions',
         'dependabot',

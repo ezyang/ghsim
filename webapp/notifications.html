@@ -51,6 +51,60 @@
             margin-bottom: 4px;
         }
 
+        .subfilter-tabs {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            border: 1px solid var(--color-border-default);
+            border-radius: 999px;
+            padding: 4px;
+            margin: 0 var(--notifications-padding);
+            background-color: var(--color-bg-default);
+        }
+
+        .subfilter-tabs + .subfilter-tabs {
+            margin-top: 6px;
+        }
+
+        .subfilter-tab {
+            padding: 6px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--color-fg-muted);
+            background-color: transparent;
+            border: none;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: color 0.1s, background-color 0.1s;
+        }
+
+        .subfilter-tab:hover {
+            color: var(--color-fg-default);
+            background-color: var(--color-bg-subtle);
+        }
+
+        .subfilter-tab.active {
+            color: #1f2328;
+            background-color: #fd8c73;
+        }
+
+        .subfilter-tab .count {
+            display: inline-block;
+            min-width: 16px;
+            padding: 0 4px;
+            font-size: 11px;
+            font-weight: 500;
+            line-height: 16px;
+            text-align: center;
+            background-color: var(--color-bg-subtle);
+            border-radius: 2em;
+            margin-left: 4px;
+        }
+
+        .subfilter-tab.active .count {
+            display: none;
+        }
+
         @media (max-width: 640px) {
             .notifications-container {
                 overflow-x: hidden;
@@ -225,110 +279,98 @@
             </nav>
 
             <!-- Subfilter Tabs for Issues -->
-            <nav class="subfilter-tabs" role="tablist" aria-label="Filter issues" data-for-view="issues" data-subfilter-group="state">
+            <nav class="subfilter-tabs" role="group" aria-label="Filter issues" data-for-view="issues" data-subfilter-group="state">
                 <button
-                    class="subfilter-tab active"
-                    role="tab"
-                    aria-selected="true"
+                    class="subfilter-tab"
                     data-subfilter="all"
+                    aria-pressed="false"
                 >
                     All <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
                     data-subfilter="open"
+                    aria-pressed="false"
                 >
                     Open <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
                     data-subfilter="closed"
+                    aria-pressed="false"
                 >
                     Closed <span class="count">0</span>
                 </button>
             </nav>
 
             <!-- Subfilter Tabs for My PRs (minimal for now) -->
-            <nav class="subfilter-tabs hidden" role="tablist" aria-label="Filter my PRs" data-for-view="my-prs" data-subfilter-group="state">
+            <nav class="subfilter-tabs hidden" role="group" aria-label="Filter my PRs" data-for-view="my-prs" data-subfilter-group="state">
                 <button
-                    class="subfilter-tab active"
-                    role="tab"
-                    aria-selected="true"
+                    class="subfilter-tab"
                     data-subfilter="all"
+                    aria-pressed="false"
                 >
                     All <span class="count">0</span>
                 </button>
             </nav>
 
             <!-- Subfilter Tabs for Others' PRs -->
-            <nav class="subfilter-tabs hidden" role="tablist" aria-label="Filter others' PRs by status" data-for-view="others-prs" data-subfilter-group="state">
+            <nav class="subfilter-tabs hidden" role="group" aria-label="Filter others' PRs by status" data-for-view="others-prs" data-subfilter-group="state">
                 <button
-                    class="subfilter-tab active"
-                    role="tab"
-                    aria-selected="true"
+                    class="subfilter-tab"
                     data-subfilter="all"
+                    aria-pressed="false"
                 >
                     All <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
                     data-subfilter="needs-review"
+                    aria-pressed="false"
                 >
                     Needs review <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
                     data-subfilter="approved"
+                    aria-pressed="false"
                 >
                     Approved <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
                     data-subfilter="draft"
+                    aria-pressed="false"
                 >
                     Draft <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
                     data-subfilter="closed"
+                    aria-pressed="false"
                 >
                     Closed <span class="count">0</span>
                 </button>
             </nav>
-            <nav class="subfilter-tabs hidden" role="tablist" aria-label="Filter others' PRs by author" data-for-view="others-prs" data-subfilter-group="author">
+            <nav class="subfilter-tabs hidden" role="group" aria-label="Filter others' PRs by author" data-for-view="others-prs" data-subfilter-group="author">
                 <button
-                    class="subfilter-tab active"
-                    role="tab"
-                    aria-selected="true"
+                    class="subfilter-tab"
                     data-subfilter="all"
+                    aria-pressed="false"
                 >
                     All <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
                     data-subfilter="committer"
+                    aria-pressed="false"
                 >
                     Committers <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
                     data-subfilter="external"
+                    aria-pressed="false"
                 >
                     External <span class="count">0</span>
                 </button>

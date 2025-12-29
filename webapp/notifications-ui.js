@@ -825,21 +825,28 @@
                 const group = tab.closest('.subfilter-tabs')?.dataset.subfilterGroup || 'state';
                 const currentSubfilter =
                     group === 'author' ? currentAuthorFilter : currentStateFilter;
-                const isActive = tabView === state.view && subfilter === currentSubfilter;
+                const isActive =
+                    tabView === state.view &&
+                    currentSubfilter !== 'all' &&
+                    subfilter === currentSubfilter;
                 tab.classList.toggle('active', isActive);
-                tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                tab.setAttribute('aria-pressed', isActive ? 'true' : 'false');
 
                 // Update count badge for visible tabs
                 if (tabView === state.view) {
                     const countSpan = tab.querySelector('.count');
                     if (countSpan) {
-                        const countMap =
-                            group === 'author' ? subfilterCounts.author : subfilterCounts.state;
-                        const countKey =
-                            group === 'state' && subfilter === 'needs-review'
-                                ? 'needsReview'
-                                : subfilter;
-                        countSpan.textContent = countMap[countKey] ?? 0;
+                        if (isActive) {
+                            countSpan.textContent = '';
+                        } else {
+                            const countMap =
+                                group === 'author' ? subfilterCounts.author : subfilterCounts.state;
+                            const countKey =
+                                group === 'state' && subfilter === 'needs-review'
+                                    ? 'needsReview'
+                                    : subfilter;
+                            countSpan.textContent = countMap[countKey] ?? 0;
+                        }
                     }
                 }
             });
