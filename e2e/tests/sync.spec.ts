@@ -33,13 +33,13 @@ test.describe('Sync Functionality', () => {
     await page.goto('notifications.html');
     await clearAppStorage(page);
     // Ensure we're on the default (no active subfilter) for Issues view
-    const prefetchToggle = page.locator('#comment-prefetch-toggle');
-    if (await prefetchToggle.isChecked()) {
-      await prefetchToggle.uncheck();
+    const expandIssuesToggle = page.locator('#comment-expand-issues-toggle');
+    if (await expandIssuesToggle.isChecked()) {
+      await expandIssuesToggle.uncheck();
     }
-    const expandToggle = page.locator('#comment-expand-toggle');
-    if (await expandToggle.isChecked()) {
-      await expandToggle.uncheck();
+    const expandPrsToggle = page.locator('#comment-expand-prs-toggle');
+    if (await expandPrsToggle.isChecked()) {
+      await expandPrsToggle.uncheck();
     }
     const hideToggle = page.locator('#comment-hide-uninteresting-toggle');
     if (await hideToggle.isChecked()) {

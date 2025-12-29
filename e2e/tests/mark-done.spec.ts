@@ -355,7 +355,8 @@ test.describe('Mark Done', () => {
         route.fulfill({ status: 204 });
       });
 
-      await page.locator('#comment-expand-toggle').check();
+      await page.locator('#comment-expand-issues-toggle').check();
+      await page.locator('#comment-expand-prs-toggle').check();
 
       await expect(page.locator('.notification-done-btn-bottom').first()).toBeVisible();
 

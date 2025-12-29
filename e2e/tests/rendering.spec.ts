@@ -258,10 +258,6 @@ test.describe('Notification Rendering', () => {
         route.fulfill({ status: 400, contentType: 'application/json', body: '{}' });
       });
 
-      await page.evaluate(() => {
-        localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
-      });
-      await page.reload();
       await page.locator('#repo-input').fill('test/repo');
       await page.locator('#sync-btn').click();
 
@@ -349,10 +345,6 @@ test.describe('Notification Rendering', () => {
         route.fulfill({ status: 400, contentType: 'application/json', body: '{}' });
       });
 
-      await page.evaluate(() => {
-        localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
-      });
-      await page.reload();
       await page.locator('#repo-input').fill('test/repo');
       await page.locator('#sync-btn').click();
 

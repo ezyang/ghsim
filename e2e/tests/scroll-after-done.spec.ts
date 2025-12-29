@@ -207,8 +207,7 @@ test.describe('Scroll After Done', () => {
     await expect(page.locator('#status-bar')).toContainText('Synced 3 notifications');
 
     // Enable comment expansion to make the first notification tall
-    await page.locator('#comment-prefetch-toggle').check();
-    await page.locator('#comment-expand-toggle').check();
+    await page.locator('#comment-expand-issues-toggle').check();
 
     // Wait for comments to load and expand
     await expect

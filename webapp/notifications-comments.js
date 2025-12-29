@@ -9,8 +9,8 @@ const COMMENT_CACHE_KEY = 'ghnotif_bulk_comment_cache_v1';
 const COMMENT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const COMMENT_CONCURRENCY = 4;
 const REVIEW_DECISION_BATCH_SIZE = 40;
-const COMMENT_PREFETCH_KEY = 'ghnotif_comment_prefetch_enabled';
-const COMMENT_EXPAND_KEY = 'ghnotif_comment_expand_enabled';
+const COMMENT_EXPAND_ISSUES_KEY = 'ghnotif_comment_expand_issues';
+const COMMENT_EXPAND_PRS_KEY = 'ghnotif_comment_expand_prs';
 const COMMENT_HIDE_UNINTERESTING_KEY = 'ghnotif_comment_hide_uninteresting';
 
 async function loadCommentCache() {
@@ -119,9 +119,6 @@ function isDiffstatFresh(cached) {
 }
 
 function scheduleCommentPrefetch(notifications) {
-    if (!state.commentPrefetchEnabled) {
-        return;
-    }
     scheduleReviewDecisionPrefetch(notifications);
     const pending = notifications.filter(shouldPrefetchNotificationComments);
     if (!pending.length) {
@@ -464,9 +461,6 @@ async function prefetchNotificationComments(notification) {
 
 function getCommentStatus(notification) {
     const cached = state.commentCache.threads[getNotificationKey(notification)];
-    if (!state.commentPrefetchEnabled) {
-        return { label: 'Comments: off', className: 'off' };
-    }
     if (!cached) {
         return { label: 'Comments: pending', className: 'pending' };
     }
@@ -490,9 +484,6 @@ function getCommentStatus(notification) {
 }
 
 function getDiffstatInfo(notification) {
-    if (!state.commentPrefetchEnabled) {
-        return null;
-    }
     if (notification.subject?.type !== 'PullRequest') {
         return null;
     }
@@ -522,11 +513,11 @@ function getDiffstatInfo(notification) {
 }
 
 function getCommentItems(notification) {
-    if (!state.commentExpandEnabled) {
+    const isIssue = notification.subject?.type === 'Issue';
+    const isPR = notification.subject?.type === 'PullRequest';
+    const shouldExpand = (isIssue && state.commentExpandIssues) || (isPR && state.commentExpandPrs);
+    if (!shouldExpand) {
         return '';
-    }
-    if (!state.commentPrefetchEnabled) {
-        return '<li class="comment-item">Enable comment fetching to show comments.</li>';
     }
     const cached = state.commentCache.threads[getNotificationKey(notification)];
     if (!cached) {
@@ -581,9 +572,6 @@ function filterCommentsAfterOwnComment(comments) {
 }
 
 function isNotificationUninteresting(notification) {
-    if (!state.commentPrefetchEnabled) {
-        return false;
-    }
     const cached = state.commentCache.threads[getNotificationKey(notification)];
     if (!cached || cached.error) {
         return false;
@@ -617,9 +605,6 @@ function isNotificationNeedsReview(notification) {
 }
 
 function isNotificationApproved(notification) {
-    if (!state.commentPrefetchEnabled) {
-        return false;
-    }
     if (notification.subject?.type !== 'PullRequest') {
         return false;
     }

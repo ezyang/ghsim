@@ -38,8 +38,9 @@
             markingInProgress: false, // Whether Mark Done is in progress
             markProgress: { current: 0, total: 0 }, // Progress tracking
             doneSnapshot: { pending: 0, done: 0 }, // Current done snapshot counts
-            commentPrefetchEnabled: false,
-            commentExpandEnabled: false,
+            commentPrefetchEnabled: true,
+            commentExpandIssues: false,
+            commentExpandPrs: false,
             commentHideUninteresting: false,
             commentQueue: [],
             commentQueueRunning: false,
@@ -67,8 +68,8 @@
             authStatus: document.getElementById('auth-status'),
             orderSelect: document.getElementById('order-select'),
             statusBar: document.getElementById('status-bar'),
-            commentPrefetchToggle: document.getElementById('comment-prefetch-toggle'),
-            commentExpandToggle: document.getElementById('comment-expand-toggle'),
+            commentExpandIssuesToggle: document.getElementById('comment-expand-issues-toggle'),
+            commentExpandPrsToggle: document.getElementById('comment-expand-prs-toggle'),
             commentHideUninterestingToggle: document.getElementById('comment-hide-uninteresting-toggle'),
             commentCacheStatus: document.getElementById('comment-cache-status'),
             clearCommentCacheBtn: document.getElementById('clear-comment-cache-btn'),
@@ -237,17 +238,17 @@
             localStorage.removeItem('ghnotif_filter');
             localStorage.removeItem('ghnotif_type_filter');
 
-            const savedCommentPrefetch = localStorage.getItem(COMMENT_PREFETCH_KEY);
-            if (savedCommentPrefetch === 'true') {
-                state.commentPrefetchEnabled = true;
+            const savedCommentExpandIssues = localStorage.getItem(COMMENT_EXPAND_ISSUES_KEY);
+            if (savedCommentExpandIssues === 'true') {
+                state.commentExpandIssues = true;
             }
-            elements.commentPrefetchToggle.checked = state.commentPrefetchEnabled;
+            elements.commentExpandIssuesToggle.checked = state.commentExpandIssues;
 
-            const savedCommentExpand = localStorage.getItem(COMMENT_EXPAND_KEY);
-            if (savedCommentExpand === 'true') {
-                state.commentExpandEnabled = true;
+            const savedCommentExpandPrs = localStorage.getItem(COMMENT_EXPAND_PRS_KEY);
+            if (savedCommentExpandPrs === 'true') {
+                state.commentExpandPrs = true;
             }
-            elements.commentExpandToggle.checked = state.commentExpandEnabled;
+            elements.commentExpandPrsToggle.checked = state.commentExpandPrs;
 
             const savedCommentHideUninteresting = localStorage.getItem(COMMENT_HIDE_UNINTERESTING_KEY);
             if (savedCommentHideUninteresting === 'true') {
@@ -296,11 +297,11 @@
                 });
             });
 
-            elements.commentPrefetchToggle.addEventListener('change', (event) => {
-                setCommentPrefetchEnabled(event.target.checked);
+            elements.commentExpandIssuesToggle.addEventListener('change', (event) => {
+                setCommentExpandIssues(event.target.checked);
             });
-            elements.commentExpandToggle.addEventListener('change', (event) => {
-                setCommentExpandEnabled(event.target.checked);
+            elements.commentExpandPrsToggle.addEventListener('change', (event) => {
+                setCommentExpandPrs(event.target.checked);
             });
             elements.commentHideUninterestingToggle.addEventListener('change', (event) => {
                 setCommentHideUninteresting(event.target.checked);
@@ -346,31 +347,15 @@
             localStorage.setItem('ghnotif_repo', value);
         }
 
-        function setCommentPrefetchEnabled(enabled) {
-            state.commentPrefetchEnabled = enabled;
-            localStorage.setItem(COMMENT_PREFETCH_KEY, String(enabled));
-            if (!enabled) {
-                render();
-                return;
-            }
-            showStatus('Fetching comments for triage filters...', 'info', { flash: true });
-            ensureLastReadAtData(state.notifications)
-                .then((notifications) => {
-                    state.notifications = notifications;
-                    persistNotifications();
-                    state.commentQueue = [];
-                    scheduleCommentPrefetch(notifications);
-                    render();
-                })
-                .catch((e) => {
-                    showStatus(`Comment prefetch setup failed: ${e.message}`, 'error');
-                    render();
-                });
+        function setCommentExpandIssues(enabled) {
+            state.commentExpandIssues = enabled;
+            localStorage.setItem(COMMENT_EXPAND_ISSUES_KEY, String(enabled));
+            render();
         }
 
-        function setCommentExpandEnabled(enabled) {
-            state.commentExpandEnabled = enabled;
-            localStorage.setItem(COMMENT_EXPAND_KEY, String(enabled));
+        function setCommentExpandPrs(enabled) {
+            state.commentExpandPrs = enabled;
+            localStorage.setItem(COMMENT_EXPAND_PRS_KEY, String(enabled));
             render();
         }
 
@@ -393,13 +378,8 @@
                 elements.orderSelect.value = state.orderBy;
             }
 
-            // Check if current subfilter requires comment prefetch
             const viewFilters = state.viewFilters[view] || DEFAULT_VIEW_FILTERS[view];
-            const stateFilter = viewFilters.state || 'all';
             const authorFilter = viewFilters.author || 'all';
-            if (stateFilter === 'approved' && !state.commentPrefetchEnabled) {
-                showStatus('Enable comment fetching to evaluate triage filters.', 'info');
-            }
             if (authorFilter === 'committer' || authorFilter === 'external') {
                 maybePrefetchReviewMetadata();
             }
@@ -418,9 +398,6 @@
             state.viewFilters[state.view][group] = next;
             localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(state.viewFilters));
 
-            if (group === 'state' && next === 'approved' && !state.commentPrefetchEnabled) {
-                showStatus('Enable comment fetching to evaluate triage filters.', 'info');
-            }
             if (group === 'author' && (next === 'committer' || next === 'external')) {
                 maybePrefetchReviewMetadata();
             }
@@ -697,10 +674,6 @@
         function updateCommentCacheStatus() {
             const cachedCount = Object.keys(state.commentCache.threads || {}).length;
             elements.clearCommentCacheBtn.disabled = cachedCount === 0;
-            if (!state.commentPrefetchEnabled) {
-                elements.commentCacheStatus.textContent = 'Comments: off';
-                return;
-            }
             elements.commentCacheStatus.textContent = `Comments cached: ${cachedCount}`;
         }
 
@@ -711,7 +684,7 @@
                 console.error('Failed to clear comment cache:', error);
             });
             localStorage.removeItem(COMMENT_CACHE_KEY);
-            if (state.commentPrefetchEnabled && state.notifications.length > 0) {
+            if (state.notifications.length > 0) {
                 scheduleCommentPrefetch(state.notifications);
                 showStatus('Comment cache cleared. Refetching comments...', 'info');
             } else {

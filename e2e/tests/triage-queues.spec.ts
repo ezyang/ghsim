@@ -129,9 +129,6 @@ test.describe('Triage queues', () => {
 
     await page.goto('notifications.html');
     await clearAppStorage(page);
-    await page.evaluate(() => {
-      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
-    });
     await seedCommentCache(page, commentCache);
     await page.reload();
     await page.locator('#repo-input').fill('test/repo');
@@ -224,7 +221,7 @@ test.describe('Triage queues', () => {
       route.fulfill({ status: 204, body: '' });
     });
 
-    await page.locator('#comment-expand-toggle').check();
+    await page.locator('#comment-expand-prs-toggle').check();
     // Switch to Others' PRs view and approved subfilter
     await page.locator('#view-others-prs').click();
     const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]');

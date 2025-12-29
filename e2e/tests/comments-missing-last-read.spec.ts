@@ -29,8 +29,7 @@ test.describe('Comments without last_read_at', () => {
 
   test('loads full thread when last_read_at is missing', async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
-      localStorage.setItem('ghnotif_comment_expand_enabled', 'true');
+      localStorage.setItem('ghnotif_comment_expand_issues', 'true');
     });
 
     await page.route('**/notifications/html/repo/test/repo', (route) => {

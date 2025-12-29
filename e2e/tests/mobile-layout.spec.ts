@@ -92,8 +92,7 @@ test.describe('Mobile layout', () => {
     await page.goto('notifications.html');
     await clearAppStorage(page);
     await page.evaluate(() => {
-      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
-      localStorage.setItem('ghnotif_comment_expand_enabled', 'true');
+      localStorage.setItem('ghnotif_comment_expand_issues', 'true');
       localStorage.setItem('ghnotif_comment_hide_uninteresting', 'false');
     });
     await seedCommentCache(page, commentCache);
