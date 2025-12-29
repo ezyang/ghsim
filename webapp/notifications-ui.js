@@ -238,10 +238,28 @@
                         // gg - scroll to top
                         scrollToTop();
                         state.lastGKeyTime = 0;
+                        state.scrollLock = null;
                         e.preventDefault();
                         return;
                     }
+                    const scrollTop = window.scrollY;
+                    const guardUntil = now + 700;
                     state.lastGKeyTime = now;
+                    state.scrollLock = { top: scrollTop, until: guardUntil };
+                    const guardId = setInterval(() => {
+                        if (state.lastGKeyTime !== now) {
+                            clearInterval(guardId);
+                            return;
+                        }
+                        if (Date.now() > guardUntil) {
+                            clearInterval(guardId);
+                            state.lastGKeyTime = 0;
+                            return;
+                        }
+                        if (window.scrollY !== scrollTop) {
+                            window.scrollTo(0, scrollTop);
+                        }
+                    }, 50);
                     e.preventDefault();
                     return;
                 }
@@ -475,6 +493,8 @@
                 showStatus('Please enter a repository (owner/repo)', 'error');
                 return;
             }
+            state.repo = repo;
+            localStorage.setItem('ghnotif_repo', repo);
             if (state.loading) {
                 return;
             }
@@ -667,7 +687,7 @@
                 const authorFilter = viewFilters.author || 'all';
                 if (authorFilter === 'committer' || authorFilter === 'external') {
                     if (typeof maybePrefetchReviewMetadata === 'function') {
-                        maybePrefetchReviewMetadata();
+                        maybePrefetchReviewMetadata({ includeAuthorAssociation: true });
                     }
                 }
 
@@ -697,7 +717,12 @@
                 ? settings.durationMs
                 : 1500;
 
-            if (flash && state.statusState && !state.statusState.isFlash) {
+            if (
+                flash &&
+                state.statusState &&
+                !state.statusState.isFlash &&
+                state.statusState.type !== 'info'
+            ) {
                 return;
             }
 
@@ -868,7 +893,7 @@
             elements.loading.className = state.loading ? 'loading visible' : 'loading';
 
             // Get filtered notifications
-            const filteredNotifications = getFilteredNotifications();
+            const filteredNotifications = state.loading ? [] : getFilteredNotifications();
             const displayNotifications = filteredNotifications;
             ensureActiveNotification(filteredNotifications);
 
@@ -1198,6 +1223,17 @@
 
                     elements.notificationsList.appendChild(li);
                 });
+            }
+
+            if (state.scrollLock) {
+                const now = Date.now();
+                if (now <= state.scrollLock.until) {
+                    if (window.scrollY !== state.scrollLock.top) {
+                        window.scrollTo(0, state.scrollLock.top);
+                    }
+                } else {
+                    state.scrollLock = null;
+                }
             }
         }
 

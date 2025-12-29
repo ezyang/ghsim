@@ -158,6 +158,9 @@ async function runCommentQueue() {
     }
     await refreshRateLimit();
     state.commentQueueRunning = false;
+    if (state.commentQueue.length) {
+        runCommentQueue();
+    }
 }
 
 function shouldPrefetchNotificationComments(notification) {
@@ -262,24 +265,35 @@ function buildReviewDecisionQuery(issueNumbers) {
     `;
 }
 
-function setReviewDecisionCache(notification, reviewDecision, authorAssociation, authorLogin) {
+function setReviewDecisionCache(
+    notification,
+    reviewDecision,
+    authorAssociation,
+    authorLogin,
+    options = {}
+) {
+    const includeAuthorAssociation = Boolean(options.includeAuthorAssociation);
     const threadId = getNotificationKey(notification);
     const existing = state.commentCache.threads[threadId] || {};
     const nowIso = new Date().toISOString();
-    state.commentCache.threads[threadId] = {
+    const next = {
         ...existing,
         notificationUpdatedAt: notification.updated_at || existing.notificationUpdatedAt,
         reviewDecision,
         reviewDecisionFetchedAt: nowIso,
-        authorAssociation,
-        authorAssociationFetchedAt: nowIso,
         authorLogin,
         authorLoginFetchedAt: nowIso,
         diffstatFetchedAt: nowIso,
     };
+    if (includeAuthorAssociation) {
+        next.authorAssociation = authorAssociation;
+        next.authorAssociationFetchedAt = nowIso;
+    }
+    state.commentCache.threads[threadId] = next;
 }
 
-async function prefetchReviewDecisions(repo, notifications) {
+async function prefetchReviewDecisions(repo, notifications, options = {}) {
+    const includeAuthorAssociation = Boolean(options.includeAuthorAssociation);
     const issueNumbers = notifications
         .map((notif) => getIssueNumber(notif))
         .filter((issueNumber) => typeof issueNumber === 'number');
@@ -318,7 +332,8 @@ async function prefetchReviewDecisions(repo, notifications) {
                     notif,
                     entry.reviewDecision,
                     entry.authorAssociation,
-                    entry.authorLogin
+                    entry.authorLogin,
+                    { includeAuthorAssociation }
                 );
                 const threadId = getNotificationKey(notif);
                 state.commentCache.threads[threadId] = {
@@ -335,7 +350,9 @@ async function prefetchReviewDecisions(repo, notifications) {
     }
 }
 
-function scheduleReviewDecisionPrefetch(notifications) {
+function scheduleReviewDecisionPrefetch(notifications, options = {}) {
+    const force = Boolean(options.force);
+    const includeAuthorAssociation = Boolean(options.includeAuthorAssociation);
     const repo = parseRepoInput(state.repo || state.lastSyncedRepo || '');
     if (!repo) {
         return;
@@ -346,16 +363,37 @@ function scheduleReviewDecisionPrefetch(notifications) {
     if (!prNotifications.length) {
         return;
     }
-    const pending = prNotifications.filter((notif) => {
-        const cached = state.commentCache.threads[getNotificationKey(notif)];
-        return (
-            !isReviewDecisionFresh(cached) ||
-            !isAuthorAssociationFresh(cached) ||
-            !isAuthorLoginFresh(cached) ||
-            !isDiffstatFresh(cached)
-        );
-    });
+    const pending = force
+        ? prNotifications
+        : prNotifications.filter((notif) => {
+            const cached = state.commentCache.threads[getNotificationKey(notif)];
+            const needsReviewDecision = !isReviewDecisionFresh(cached);
+            const needsAuthorAssociation =
+                includeAuthorAssociation && !isAuthorAssociationFresh(cached);
+            const needsAuthorLogin = !isAuthorLoginFresh(cached);
+            const needsDiffstat = !isDiffstatFresh(cached);
+            return (
+                needsReviewDecision ||
+                needsAuthorAssociation ||
+                needsAuthorLogin ||
+                needsDiffstat
+            );
+        });
     if (!pending.length) {
+        return;
+    }
+    if (force) {
+        showStatus(`Review metadata prefetch: fetching ${pending.length} PRs`, 'info', {
+            flash: true,
+        });
+        prefetchReviewDecisions(repo, pending, { includeAuthorAssociation })
+            .then(() => {
+                saveCommentCache();
+                render();
+            })
+            .catch((error) => {
+                console.error('Review metadata prefetch failed:', error);
+            });
         return;
     }
     showStatus(
@@ -363,7 +401,9 @@ function scheduleReviewDecisionPrefetch(notifications) {
         'info',
         { flash: true }
     );
-    state.commentQueue.push(() => prefetchReviewDecisions(repo, pending));
+    state.commentQueue.push(() =>
+        prefetchReviewDecisions(repo, pending, { includeAuthorAssociation })
+    );
     runCommentQueue();
 }
 
@@ -488,7 +528,7 @@ function getDiffstatInfo(notification) {
         return null;
     }
     const cached = state.commentCache.threads[getNotificationKey(notification)];
-    if (!cached || cached.error || !isDiffstatFresh(cached)) {
+    if (!cached || !isDiffstatFresh(cached)) {
         return null;
     }
     const additions = cached.additions;

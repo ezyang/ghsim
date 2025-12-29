@@ -137,9 +137,6 @@
             if (total === 0) {
                 return;
             }
-            if (elements.statusBar.classList.contains('error')) {
-                return;
-            }
             showStatus(`Done ${done}/${total} (${pending} pending)`, 'success');
         }
 

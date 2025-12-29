@@ -65,6 +65,7 @@
             lastSyncedRepo: null,
             // Keyboard navigation
             lastGKeyTime: 0, // For vim-style 'gg' sequence
+            scrollLock: null,
             // Undo support
             authenticity_token: null, // CSRF token for HTML form actions
             undoStack: [], // Stack of {action, notifications, timestamp}
@@ -541,6 +542,9 @@
                     state.orderBy = nextOrder;
                     state.viewOrders[state.view] = nextOrder;
                     localStorage.setItem(ORDER_BY_VIEW_KEY, JSON.stringify(state.viewOrders));
+                    if (nextOrder === 'size' && state.view !== 'issues') {
+                        maybePrefetchReviewMetadata();
+                    }
                     render();
                 });
             }
@@ -660,7 +664,7 @@
             const viewFilters = state.viewFilters[view] || DEFAULT_VIEW_FILTERS[view];
             const authorFilter = viewFilters.author || 'all';
             if (authorFilter === 'committer' || authorFilter === 'external') {
-                maybePrefetchReviewMetadata();
+                maybePrefetchReviewMetadata({ includeAuthorAssociation: true });
             }
             render();
         }
@@ -678,6 +682,13 @@
             localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(state.viewFilters));
 
             if (group === 'author' && (next === 'committer' || next === 'external')) {
+                maybePrefetchReviewMetadata({ force: true, includeAuthorAssociation: true });
+            }
+            if (
+                state.view === 'others-prs' &&
+                group === 'state' &&
+                (next === 'needs-review' || next === 'approved')
+            ) {
                 maybePrefetchReviewMetadata();
             }
             render();
@@ -809,9 +820,9 @@
             return !safeIsNotificationFromCommitter(notification);
         }
 
-        function maybePrefetchReviewMetadata() {
+        function maybePrefetchReviewMetadata(options = {}) {
             if (typeof scheduleReviewDecisionPrefetch === 'function') {
-                scheduleReviewDecisionPrefetch(state.notifications);
+                scheduleReviewDecisionPrefetch(state.notifications, options);
             }
         }
 

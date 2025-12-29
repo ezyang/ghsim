@@ -263,8 +263,8 @@
             return `${repo}:${type}:${match[2]}`;
         }
 
-        async function fetchJson(url) {
-            const response = await fetch(url);
+        async function fetchJson(url, options = {}) {
+            const response = await fetch(url, options);
             if (!response.ok) {
                 let detail = '';
                 try {
@@ -294,9 +294,17 @@
                         'info',
                         { flash: true }
                     );
-                    payload = await fetchJson(url);
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 3000);
+                    try {
+                        payload = await fetchJson(url, { signal: controller.signal });
+                    } finally {
+                        clearTimeout(timeoutId);
+                    }
                 } catch (error) {
-                    showStatus(`Rate limit fetch failed: ${error.message || error}`, 'error');
+                    showStatus(`Rate limit fetch failed: ${error.message || error}`, 'info', {
+                        flash: true,
+                    });
                     break;
                 }
                 if (!Array.isArray(payload) || payload.length === 0) {
@@ -562,6 +570,8 @@
                 showStatus('Please enter a repository (owner/repo)', 'error');
                 return;
             }
+            state.repo = repo;
+            localStorage.setItem('ghnotif_repo', repo);
             if (state.loading) {
                 return;
             }
@@ -754,7 +764,7 @@
                 const authorFilter = viewFilters.author || 'all';
                 if (authorFilter === 'committer' || authorFilter === 'external') {
                     if (typeof maybePrefetchReviewMetadata === 'function') {
-                        maybePrefetchReviewMetadata();
+                        maybePrefetchReviewMetadata({ includeAuthorAssociation: true });
                     }
                 }
 
@@ -784,7 +794,12 @@
                 ? settings.durationMs
                 : 1500;
 
-            if (flash && state.statusState && !state.statusState.isFlash) {
+            if (
+                flash &&
+                state.statusState &&
+                !state.statusState.isFlash &&
+                state.statusState.type !== 'info'
+            ) {
                 return;
             }
 
