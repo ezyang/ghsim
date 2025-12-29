@@ -36,6 +36,13 @@
         .comment-body.markdown-body {
             font-size: 14px;
             line-height: 1.5;
+            overflow-x: auto;
+        }
+
+        .comment-body.markdown-body img {
+            max-width: none;
+            width: auto;
+            height: auto;
         }
 
         .comment-body details.collapsed-versions {
@@ -51,19 +58,41 @@
             margin-bottom: 4px;
         }
 
+        .subfilter-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .subfilter-stack {
+            display: flex;
+            flex-wrap: nowrap;
+            gap: 8px;
+            align-items: center;
+            margin: 0 var(--notifications-padding);
+            min-width: 0;
+        }
+
         .subfilter-tabs {
             display: inline-flex;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             gap: 4px;
             border: 1px solid var(--color-border-default);
             border-radius: 999px;
             padding: 4px;
-            margin: 0 var(--notifications-padding);
+            margin: 0;
             background-color: var(--color-bg-default);
+            white-space: nowrap;
         }
 
         .subfilter-tabs + .subfilter-tabs {
-            margin-top: 6px;
+            margin-top: 0;
+        }
+
+        .order-control {
+            margin-left: auto;
+            padding: 0 var(--notifications-padding) 0 0;
         }
 
         .subfilter-tab {
@@ -114,6 +143,24 @@
         }
 
         @media (max-width: 640px) {
+            .subfilter-row {
+                align-items: flex-start;
+            }
+
+            .subfilter-stack {
+                flex-wrap: wrap;
+            }
+
+            .order-control {
+                margin-left: 0;
+                padding: 8px var(--notifications-padding) 0;
+            }
+
+            .subfilter-tabs {
+                flex-wrap: wrap;
+                white-space: normal;
+            }
+
             .notifications-container {
                 overflow-x: hidden;
             }

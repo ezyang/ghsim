@@ -683,7 +683,7 @@
                     }
                 }
 
-                if (syncMode === 'incremental' && overlapIndex !== null) {
+                if (syncMode === 'incremental') {
                     const fetchedKeys = buildNotificationMatchKeySet(allNotifications, repoInfo);
                     const cachedKeys = new Set();
                     notifications.forEach((notif) => {
@@ -694,7 +694,7 @@
                     });
                     notifications = await refreshPullRequestStates(repoInfo, notifications, {
                         syncLabel,
-                        matchKeys: cachedKeys,
+                        matchKeys: overlapIndex !== null ? cachedKeys : null,
                     });
                 }
 

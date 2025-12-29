@@ -483,6 +483,7 @@
             }
 
             const [owner, repoName] = parts;
+            const repoInfo = { owner, repo: repoName };
             const previousNotifications = state.notifications.slice();
             const previousSelected = new Set(state.selected);
             const syncMode = mode === 'full' ? 'full' : 'incremental';
@@ -633,6 +634,21 @@
                             'info'
                         );
                     }
+                }
+
+                if (syncMode === 'incremental' && overlapIndex !== null) {
+                    const fetchedKeys = buildNotificationMatchKeySet(allNotifications, repoInfo);
+                    const cachedKeys = new Set();
+                    notifications.forEach((notif) => {
+                        const key = getNotificationMatchKeyForRepo(notif, repoInfo);
+                        if (key && !fetchedKeys.has(key)) {
+                            cachedKeys.add(key);
+                        }
+                    });
+                    notifications = await refreshPullRequestStates(repoInfo, notifications, {
+                        syncLabel,
+                        matchKeys: cachedKeys,
+                    });
                 }
 
                 state.notifications = notifications;

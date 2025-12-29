@@ -201,6 +201,36 @@ test.describe('Comment visibility', () => {
     expect(maxWidth).toBe('1200px');
   });
 
+  test('renders markdown images at natural size with scrollable overflow', async ({
+    page,
+  }) => {
+    await page.evaluate(() => {
+      const body = document.querySelector('.comment-body.markdown-body');
+      if (!body) {
+        return;
+      }
+      const svg =
+        "<svg xmlns='http://www.w3.org/2000/svg' width='800' height='600'></svg>";
+      const img = document.createElement('img');
+      img.alt = 'markdown image';
+      img.src = `data:image/svg+xml,${encodeURIComponent(svg)}`;
+      body.appendChild(img);
+    });
+
+    const commentBody = page.locator('.comment-body.markdown-body').first();
+    const overflowX = await commentBody.evaluate((element) => {
+      return window.getComputedStyle(element).overflowX;
+    });
+    expect(overflowX).toBe('auto');
+
+    const image = page.locator('.comment-body.markdown-body img').last();
+    await expect(image).toBeVisible();
+    const maxWidth = await image.evaluate((element) => {
+      return window.getComputedStyle(element).maxWidth;
+    });
+    expect(maxWidth).toBe('none');
+  });
+
   test('notification header has sticky positioning when comments are expanded', async ({
     page,
   }) => {
