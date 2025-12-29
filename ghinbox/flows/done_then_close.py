@@ -75,19 +75,48 @@ class DoneThenCloseFlow(BaseFlow):
 
             print(f"Notification thread ID: {thread_id}")
 
-            # Capture initial state (before done)
+            # Capture initial state (before read)
             print(f"\n{'=' * 60}")
-            print("Snapshot 1: Before marking as done")
+            print("Snapshot 1: Before any action (unread)")
             print(f"{'=' * 60}")
-            snapshot_before_done = self._capture_full_snapshot(
-                label="before_done",
+            snapshot_before_read = self._capture_full_snapshot(
+                label="before_read",
                 thread_id=thread_id,
                 issue_number=issue_number,
             )
 
-            # Step 2: Mark as DONE via web UI
+            # Step 2: Explicitly READ by navigating to issue page
             print(f"\n{'=' * 60}")
-            print("Step 2: Marking notification as DONE")
+            print("Step 2: Reading notification (navigating to issue page)")
+            print(f"{'=' * 60}")
+
+            with sync_playwright() as p:
+                context = self.create_browser_context(p)
+                if context is None:
+                    print("Failed to create browser context")
+                    return False
+
+                page = context.new_page()
+                self._read_notification_via_ui(page, issue_number)
+
+                if context.browser:
+                    context.browser.close()
+
+            time.sleep(3)  # Let GitHub process the read state
+
+            # Capture state after read
+            print(f"\n{'=' * 60}")
+            print("Snapshot 2: After reading (before done)")
+            print(f"{'=' * 60}")
+            snapshot_after_read = self._capture_full_snapshot(
+                label="after_read",
+                thread_id=thread_id,
+                issue_number=issue_number,
+            )
+
+            # Step 3: Mark as DONE via web UI
+            print(f"\n{'=' * 60}")
+            print("Step 3: Marking notification as DONE")
             print(f"{'=' * 60}")
 
             with sync_playwright() as p:
@@ -106,7 +135,7 @@ class DoneThenCloseFlow(BaseFlow):
 
             # Capture state after done
             print(f"\n{'=' * 60}")
-            print("Snapshot 2: After marking as done")
+            print("Snapshot 3: After marking as done")
             print(f"{'=' * 60}")
             snapshot_after_done = self._capture_full_snapshot(
                 label="after_done",
@@ -118,9 +147,9 @@ class DoneThenCloseFlow(BaseFlow):
             pre_close_time = datetime.now(timezone.utc).isoformat()
             print(f"Pre-close time: {pre_close_time}")
 
-            # Step 3: Close the issue from trigger account
+            # Step 4: Close the issue from trigger account
             print(f"\n{'=' * 60}")
-            print("Step 3: Closing the issue")
+            print("Step 4: Closing the issue")
             print(f"{'=' * 60}")
 
             self.trigger_api.close_issue(
@@ -146,7 +175,7 @@ class DoneThenCloseFlow(BaseFlow):
 
             # Capture final state
             print(f"\n{'=' * 60}")
-            print("Snapshot 3: After issue close")
+            print("Snapshot 4: After issue close")
             print(f"{'=' * 60}")
             snapshot_after_close = self._capture_full_snapshot(
                 label="after_close",
@@ -176,7 +205,8 @@ class DoneThenCloseFlow(BaseFlow):
             print("ANALYSIS: Timestamp Behavior")
             print(f"{'=' * 60}")
             self._analyze_timestamps(
-                snapshot_before_done,
+                snapshot_before_read,
+                snapshot_after_read,
                 snapshot_after_done,
                 snapshot_after_close,
                 pre_close_time,
@@ -297,6 +327,22 @@ class DoneThenCloseFlow(BaseFlow):
 
         return None
 
+    def _read_notification_via_ui(self, page: Page, issue_number: int) -> None:
+        """Read the notification by navigating to the issue page."""
+        issue_url = f"https://github.com/{self.owner_username}/{self.repo_name}/issues/{issue_number}"
+        print(f"Navigating to issue page: {issue_url}")
+
+        page.goto(issue_url, wait_until="domcontentloaded")
+        # Wait for issue content to load
+        page.locator(
+            '[data-testid="issue-title"], .markdown-body, .comment-body, .js-issue-title'
+        ).first.wait_for(state="attached", timeout=10000)
+
+        RESPONSES_DIR.mkdir(parents=True, exist_ok=True)
+        page.screenshot(path=str(RESPONSES_DIR / "done_then_close_issue_page.png"))
+        print("Screenshot saved: done_then_close_issue_page.png")
+        print("Issue page loaded - notification should now be marked as read")
+
     def _mark_as_done_via_ui(self, page: Page) -> None:
         """Mark the notification as done using the Done button."""
         query = f"repo:{self.owner_username}/{self.repo_name}"
@@ -379,94 +425,115 @@ class DoneThenCloseFlow(BaseFlow):
 
     def _analyze_timestamps(
         self,
-        before_done: dict[str, Any],
+        before_read: dict[str, Any],
+        after_read: dict[str, Any],
         after_done: dict[str, Any],
         after_close: dict[str, Any],
         pre_close_time: str,
     ) -> None:
-        """Analyze timestamp behavior across the three snapshots."""
+        """Analyze timestamp behavior across the four snapshots."""
         print("\n" + "=" * 60)
         print("TIMESTAMP COMPARISON")
         print("=" * 60)
 
         print("\n1. NOTIFICATION TIMESTAMPS:")
-        print(f"   Before done:  {before_done.get('notification_updated_at')}")
+        print(f"   Before read:  {before_read.get('notification_updated_at')}")
+        print(f"   After read:   {after_read.get('notification_updated_at')}")
         print(f"   After done:   {after_done.get('notification_updated_at')}")
         print(f"   After close:  {after_close.get('notification_updated_at')}")
 
-        print("\n2. THREAD TIMESTAMPS:")
-        print(f"   Before done updated_at:   {before_done.get('thread_updated_at')}")
-        print(f"   Before done last_read_at: {before_done.get('thread_last_read_at')}")
-        print(f"   After done updated_at:    {after_done.get('thread_updated_at')}")
-        print(f"   After done last_read_at:  {after_done.get('thread_last_read_at')}")
-        print(f"   After close updated_at:   {after_close.get('thread_updated_at')}")
-        print(f"   After close last_read_at: {after_close.get('thread_last_read_at')}")
+        print("\n2. THREAD last_read_at (KEY FIELD):")
+        print(f"   Before read:  {before_read.get('thread_last_read_at')}")
+        print(f"   After read:   {after_read.get('thread_last_read_at')}")
+        print(f"   After done:   {after_done.get('thread_last_read_at')}")
+        print(f"   After close:  {after_close.get('thread_last_read_at')}")
 
-        print("\n3. ISSUE TIMESTAMPS:")
-        print(f"   Before done: {before_done.get('issue_updated_at')}")
-        print(f"   After done:  {after_done.get('issue_updated_at')}")
-        print(f"   After close: {after_close.get('issue_updated_at')}")
+        print("\n3. THREAD updated_at:")
+        print(f"   Before read:  {before_read.get('thread_updated_at')}")
+        print(f"   After read:   {after_read.get('thread_updated_at')}")
+        print(f"   After done:   {after_done.get('thread_updated_at')}")
+        print(f"   After close:  {after_close.get('thread_updated_at')}")
 
-        print(f"\n4. PRE-CLOSE REFERENCE TIME: {pre_close_time}")
+        print("\n4. ISSUE TIMESTAMPS:")
+        print(f"   Before read:  {before_read.get('issue_updated_at')}")
+        print(f"   After read:   {after_read.get('issue_updated_at')}")
+        print(f"   After done:   {after_done.get('issue_updated_at')}")
+        print(f"   After close:  {after_close.get('issue_updated_at')}")
+
+        print(f"\n5. PRE-CLOSE REFERENCE TIME: {pre_close_time}")
 
         # Key analysis
         print("\n" + "=" * 60)
         print("KEY FINDINGS")
         print("=" * 60)
 
+        # Check if reading sets last_read_at
+        last_read_before = before_read.get("thread_last_read_at")
+        last_read_after_read = after_read.get("thread_last_read_at")
+        last_read_after_done = after_done.get("thread_last_read_at")
+        last_read_after_close = after_close.get("thread_last_read_at")
+
+        print("\n** last_read_at behavior (critical for filtering) **")
+        if last_read_before is None and last_read_after_read is not None:
+            print("✓ Reading the issue page SETS last_read_at")
+            print(f"  Value: {last_read_after_read}")
+        elif last_read_before is None and last_read_after_read is None:
+            print("✗ Reading the issue page does NOT set last_read_at")
+        else:
+            print(f"  Before read: {last_read_before}")
+            print(f"  After read:  {last_read_after_read}")
+
+        if last_read_after_read is not None and last_read_after_done is not None:
+            if last_read_after_read == last_read_after_done:
+                print("✓ Marking as done PRESERVES last_read_at")
+            else:
+                print("⚠ Marking as done CHANGES last_read_at")
+                print(f"  After read: {last_read_after_read}")
+                print(f"  After done: {last_read_after_done}")
+        elif last_read_after_read is not None and last_read_after_done is None:
+            print("✗ Marking as done CLEARS last_read_at")
+
+        if last_read_after_done is not None and last_read_after_close is not None:
+            if last_read_after_done == last_read_after_close:
+                print("✓ New activity (close) PRESERVES last_read_at")
+            else:
+                print("⚠ New activity (close) CHANGES last_read_at")
+        elif last_read_after_done is not None and last_read_after_close is None:
+            print("✗ New activity (close) CLEARS last_read_at")
+
+        # Check unread status progression
+        print("\n** Unread status progression **")
+        print(f"   Before read: {before_read.get('notification_unread')}")
+        print(f"   After read:  {after_read.get('notification_unread')}")
+        print(f"   After done:  {after_done.get('notification_unread')}")
+        print(f"   After close: {after_close.get('notification_unread')}")
+
         # Compare notification updated_at with pre_close_time
         after_close_updated = after_close.get("notification_updated_at")
         if after_close_updated:
-            print(f"\nNotification updated_at after close: {after_close_updated}")
-            print(f"Pre-close reference time:            {pre_close_time}")
+            print("\n** Notification updated_at after close **")
+            print(f"   Notification: {after_close_updated}")
+            print(f"   Pre-close:    {pre_close_time}")
 
-            # Parse and compare times
-            try:
-                close_ts = self._parse_iso(after_close_updated)
-                pre_ts = self._parse_iso(pre_close_time)
-                if close_ts and pre_ts:
-                    if close_ts >= pre_ts:
-                        print(
-                            "✓ Notification timestamp is at or after close time "
-                            "(expected - reflects close event)"
-                        )
-                    else:
-                        print(
-                            "⚠ Notification timestamp is BEFORE close time "
-                            "(unexpected - may be using old timestamp)"
-                        )
-            except Exception as e:
-                print(f"Could not compare timestamps: {e}")
-
-        # Check if notification reappeared as unread
-        was_unread_before = before_done.get("notification_unread")
-        is_unread_after = after_close.get("notification_unread")
-        print(f"\nUnread status before done: {was_unread_before}")
-        print(f"Unread status after close: {is_unread_after}")
-
-        # Check last_read_at behavior
-        last_read_before = before_done.get("thread_last_read_at")
-        last_read_after = after_close.get("thread_last_read_at")
-        print(f"\nlast_read_at before done: {last_read_before}")
-        print(f"last_read_at after close: {last_read_after}")
-
-        # Comments analysis
-        print(f"\nComment count before done: {before_done.get('comments_count')}")
-        print(f"Comment count after close: {after_close.get('comments_count')}")
-
-        # Timeline analysis
-        print(f"\nTimeline events before done: {before_done.get('timeline_count')}")
-        print(f"Timeline events after close: {after_close.get('timeline_count')}")
+        # Comments and timeline analysis
+        print("\n** Activity counts **")
+        print(f"   Comments before: {before_read.get('comments_count')}")
+        print(f"   Comments after:  {after_close.get('comments_count')}")
+        print(f"   Timeline before: {before_read.get('timeline_count')}")
+        print(f"   Timeline after:  {after_close.get('timeline_count')}")
 
         print("\n" + "=" * 60)
         print("IMPLICATIONS FOR COMMENT FETCHING")
         print("=" * 60)
-        print("\nIf last_read_at is preserved after marking as done, then using it")
-        print(
-            "as a 'since' filter for comments should correctly return only new activity."
-        )
-        print("If last_read_at is cleared or reset, all comments would be fetched.")
-        print("\nCheck the saved JSON files for detailed timeline and comment data.")
+
+        if last_read_after_close is not None:
+            print(f"\n✓ last_read_at is available: {last_read_after_close}")
+            print("  You can use this as a 'since' filter to get only new activity.")
+            print("  Comments/events with created_at > last_read_at are 'new'.")
+        else:
+            print("\n✗ last_read_at is None after the close event.")
+            print("  No timestamp is available to filter 'new' activity.")
+            print("  All comments would be fetched when notification returns.")
 
     def _parse_iso(self, ts: str | None) -> datetime | None:
         """Parse ISO datetime string."""

@@ -582,6 +582,89 @@
             return null;
         }
 
+        const AUTH_CACHE_KEY = 'ghnotif_auth_cache';
+        const AUTH_CACHE_TTL_MS = 5 * 60 * 1000;
+
+        function getCachedAuthLogin() {
+            try {
+                const raw = localStorage.getItem(AUTH_CACHE_KEY);
+                if (!raw) {
+                    return null;
+                }
+                const cached = JSON.parse(raw);
+                if (!cached || !cached.login || !cached.timestamp) {
+                    return null;
+                }
+                if (Date.now() - cached.timestamp > AUTH_CACHE_TTL_MS) {
+                    return null;
+                }
+                return cached.login;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function ensureCurrentUserLogin() {
+            if (state.currentUserLogin) {
+                return state.currentUserLogin;
+            }
+            const cachedLogin = getCachedAuthLogin();
+            if (cachedLogin) {
+                state.currentUserLogin = cachedLogin;
+            }
+            return state.currentUserLogin;
+        }
+
+        async function reloadNotificationFromServer(notification) {
+            const repo = parseRepoInput(state.repo || '');
+            if (!repo || !notification) {
+                return { status: 'error', error: 'Missing repository or notification.' };
+            }
+            let response;
+            try {
+                const url = `/notifications/html/repo/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}`;
+                response = await fetch(url);
+            } catch (error) {
+                return { status: 'error', error: error.message || String(error) };
+            }
+            if (!response.ok) {
+                let detail = '';
+                try {
+                    detail = await response.text();
+                } catch (error) {
+                    detail = String(error);
+                }
+                return {
+                    status: 'error',
+                    error: `Reload failed: ${response.status} ${response.statusText} ${detail}`,
+                };
+            }
+            let payload;
+            try {
+                payload = await response.json();
+            } catch (error) {
+                return { status: 'error', error: error.message || String(error) };
+            }
+            if (payload?.authenticity_token) {
+                state.authenticity_token = payload.authenticity_token;
+                persistAuthenticityToken(payload.authenticity_token);
+            }
+            const notifications = Array.isArray(payload?.notifications) ? payload.notifications : [];
+            let updated = notifications.find((candidate) => candidate.id === notification.id);
+            if (!updated && typeof getNotificationMatchKey === 'function') {
+                const matchKey = getNotificationMatchKey(notification);
+                if (matchKey) {
+                    updated = notifications.find(
+                        (candidate) => getNotificationMatchKey(candidate) === matchKey
+                    );
+                }
+            }
+            if (!updated) {
+                return { status: 'missing' };
+            }
+            return { status: 'ok', notification: updated };
+        }
+
         async function syncNotificationBeforeDone(notifId, notification) {
             const threadId = isNodeId(notifId) ? extractThreadIdFromNodeId(notifId) : notifId;
             if (!threadId) {
@@ -653,15 +736,27 @@
                     return { status: 'ok', updatedNotification };
                 }
 
-                if (updatedNotification) {
-                    const index = state.notifications.findIndex(n => n.id === updatedNotification.id);
+                let refreshedNotification = updatedNotification;
+                const reloadResult = await reloadNotificationFromServer(updatedNotification || notification);
+                if (reloadResult?.notification) {
+                    refreshedNotification = {
+                        ...reloadResult.notification,
+                        updated_at: updatedNotification?.updated_at ?? reloadResult.notification.updated_at,
+                        last_read_at: updatedNotification?.last_read_at ?? reloadResult.notification.last_read_at,
+                        unread: updatedNotification?.unread ?? reloadResult.notification.unread,
+                    };
+                }
+                if (refreshedNotification) {
+                    const index = state.notifications.findIndex(
+                        n => n.id === refreshedNotification.id
+                    );
                     if (index !== -1) {
-                        state.notifications[index] = updatedNotification;
+                        state.notifications[index] = refreshedNotification;
                         persistNotifications();
                     }
                     if (state.commentPrefetchEnabled &&
                         typeof prefetchNotificationComments === 'function') {
-                        await prefetchNotificationComments(updatedNotification);
+                        await prefetchNotificationComments(refreshedNotification);
                         if (typeof saveCommentCache === 'function') {
                             saveCommentCache();
                         }
@@ -671,7 +766,7 @@
                 return {
                     status: 'updated',
                     reason: 'New comments detected',
-                    updatedNotification,
+                    updatedNotification: refreshedNotification,
                 };
             } catch (error) {
                 return { status: 'error', error: error.message || String(error) };
@@ -706,7 +801,7 @@
                 if (comments.length === 0) {
                     return { status: 'ok', hasNew: false, allowDone: true };
                 }
-                const currentUser = String(state.currentUserLogin || '').toLowerCase();
+                const currentUser = String(ensureCurrentUserLogin() || '').toLowerCase();
                 const allowDone = comments.every((comment) => {
                     const author = String(comment?.user?.login || '').toLowerCase();
                     const isOwn = Boolean(currentUser) && author === currentUser;

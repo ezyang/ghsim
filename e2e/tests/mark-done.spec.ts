@@ -330,6 +330,76 @@ test.describe('Mark Done', () => {
       expect(deleteCalled).toBe(false);
     });
 
+    test('reloads notification details when new comments are detected', async ({ page }) => {
+      let deleteCalled = false;
+      let reloadCalled = false;
+
+      await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ updated_at: '2024-12-28T00:00:00Z' }),
+          });
+          return;
+        }
+        deleteCalled = true;
+        route.fulfill({ status: 204 });
+      });
+      await page.route(
+        '**/github/rest/repos/test/repo/issues/42/comments**',
+        (route) => {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify([
+              {
+                id: 1,
+                user: { login: 'alice' },
+                body: 'New comment',
+                created_at: '2024-12-28T00:00:00Z',
+                updated_at: '2024-12-28T00:00:00Z',
+              },
+            ]),
+          });
+        }
+      );
+
+      await page.unroute('**/notifications/html/repo/**');
+      const updatedFixture = {
+        ...mixedFixture,
+        notifications: mixedFixture.notifications.map((notification) =>
+          notification.id === 'notif-1'
+            ? {
+                ...notification,
+                subject: {
+                  ...notification.subject,
+                  title: 'Fix critical bug in authentication (updated)',
+                },
+                updated_at: '2024-12-28T00:00:00Z',
+              }
+            : notification
+        ),
+      };
+      await page.route('**/notifications/html/repo/**', (route) => {
+        reloadCalled = true;
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(updatedFixture),
+        });
+      });
+
+      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+
+      await expect(page.locator('#status-bar')).toContainText('New comments');
+      await expect(
+        page.locator('[data-id="notif-1"] .notification-title')
+      ).toContainText('Fix critical bug in authentication (updated)');
+      expect(deleteCalled).toBe(false);
+      expect(reloadCalled).toBe(true);
+    });
+
     test('allows marking done when new comments are uninteresting or own', async ({ page }) => {
       let deleteCalled = false;
 
