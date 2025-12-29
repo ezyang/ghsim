@@ -2,6 +2,12 @@ import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
 import { clearAppStorage, readNotificationsCache } from './storage-utils';
 
+const THREAD_SYNC_PAYLOAD = {
+  updated_at: '2000-01-01T00:00:00Z',
+  last_read_at: null,
+  unread: true,
+};
+
 // Helper to encode a thread_id into a node ID format
 // Real GitHub node IDs are base64 encoded and contain "thread_id:user_id"
 function encodeNodeId(threadId: number, userId: number = 26517921): string {
@@ -118,6 +124,14 @@ test.describe('Mark Done', () => {
 
       // Mock the mark done API
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         apiCalls.push(route.request().url());
         route.fulfill({
           status: 204,
@@ -146,6 +160,22 @@ test.describe('Mark Done', () => {
       const apiCalls: string[] = [];
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         apiCalls.push(route.request().url());
         route.fulfill({ status: 204 });
       });
@@ -166,6 +196,22 @@ test.describe('Mark Done', () => {
       let requestMethod = '';
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         requestMethod = route.request().method();
         route.fulfill({ status: 204 });
       });
@@ -183,6 +229,22 @@ test.describe('Mark Done', () => {
       const apiCalls: string[] = [];
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         apiCalls.push(route.request().url());
         route.fulfill({ status: 204 });
       });
@@ -198,8 +260,39 @@ test.describe('Mark Done', () => {
       expect(apiCalls[0]).toContain('notif-1');
     });
 
+    test('skips marking done when new comments are detected', async ({ page }) => {
+      let deleteCalled = false;
+
+      await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ updated_at: '2024-12-28T00:00:00Z' }),
+          });
+          return;
+        }
+        deleteCalled = true;
+        route.fulfill({ status: 204 });
+      });
+
+      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
+
+      await expect(page.locator('[data-id="notif-1"]')).toHaveCount(1);
+      await expect(page.locator('#status-bar')).toContainText('New comments');
+      expect(deleteCalled).toBe(false);
+    });
+
     test('bottom done button removes the notification from the list', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 204 });
       });
 
@@ -217,6 +310,14 @@ test.describe('Mark Done', () => {
     test('keeps the next notification anchored after removal', async ({ page }) => {
       await page.setViewportSize({ width: 1200, height: 360 });
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 204 });
       });
 
@@ -245,6 +346,22 @@ test.describe('Mark Done', () => {
       });
 
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         await responseGate;
         route.fulfill({ status: 204 });
       });
@@ -277,6 +394,22 @@ test.describe('Mark Done', () => {
       });
 
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         callCount++;
         if (callCount === 1) {
           await firstGate;
@@ -308,6 +441,14 @@ test.describe('Mark Done', () => {
     test('progress bar appears during Mark Done operation', async ({ page }) => {
       // Mock with delay to see progress
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         await new Promise((r) => setTimeout(r, 200));
         route.fulfill({ status: 204 });
       });
@@ -327,6 +468,22 @@ test.describe('Mark Done', () => {
       let callCount = 0;
 
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         callCount++;
         await new Promise((r) => setTimeout(r, 100));
         route.fulfill({ status: 204 });
@@ -349,6 +506,14 @@ test.describe('Mark Done', () => {
 
     test('progress bar hides after completion', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 204 });
       });
 
@@ -365,6 +530,14 @@ test.describe('Mark Done', () => {
   test.describe('Removing Marked Notifications', () => {
     test('successfully marked notifications are removed from the list', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 204 });
       });
 
@@ -383,6 +556,14 @@ test.describe('Mark Done', () => {
 
     test('notification count updates after marking done', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 204 });
       });
 
@@ -401,6 +582,14 @@ test.describe('Mark Done', () => {
 
     test('IndexedDB is updated after marking done', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 204 });
       });
 
@@ -417,6 +606,14 @@ test.describe('Mark Done', () => {
 
     test('selection is cleared for marked items', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 204 });
       });
 
@@ -431,6 +628,14 @@ test.describe('Mark Done', () => {
   test.describe('Error Handling', () => {
     test('shows error when API fails', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 500 });
       });
 
@@ -444,6 +649,14 @@ test.describe('Mark Done', () => {
 
     test('failed notifications remain in list', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 500 });
       });
 
@@ -460,6 +673,22 @@ test.describe('Mark Done', () => {
       let callCount = 0;
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         callCount++;
         // First call succeeds, second fails
         if (callCount === 1) {
@@ -481,6 +710,22 @@ test.describe('Mark Done', () => {
       let callCount = 0;
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         callCount++;
         if (callCount === 1) {
           route.fulfill({ status: 204 });
@@ -504,6 +749,14 @@ test.describe('Mark Done', () => {
   test.describe('UI State During Operation', () => {
     test('Mark Done button is disabled during operation', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         await new Promise((r) => setTimeout(r, 200));
         route.fulfill({ status: 204 });
       });
@@ -518,6 +771,14 @@ test.describe('Mark Done', () => {
 
     test('Select All checkbox is disabled during operation', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         await new Promise((r) => setTimeout(r, 200));
         route.fulfill({ status: 204 });
       });
@@ -532,6 +793,14 @@ test.describe('Mark Done', () => {
 
     test('buttons are re-enabled after completion', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 204 });
       });
 
@@ -553,6 +822,22 @@ test.describe('Mark Done', () => {
       let callCount = 0;
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         callCount++;
         if (callCount === 1) {
           // First call: rate limited
@@ -620,6 +905,14 @@ test.describe('Mark Done with Node IDs', () => {
 
     // Mock REST API endpoint
     await page.route('**/github/rest/notifications/threads/**', async (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       apiCalls.push(route.request().url());
       route.fulfill({ status: 204 });
     });
@@ -644,6 +937,22 @@ test.describe('Mark Done with Node IDs', () => {
     let requestMethod = '';
 
     await page.route('**/github/rest/notifications/threads/**', async (route) => {
+
+      if (route.request().method() === 'GET') {
+
+        route.fulfill({
+
+          status: 200,
+
+          contentType: 'application/json',
+
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+        });
+
+        return;
+
+      }
       requestMethod = route.request().method();
       route.fulfill({ status: 204 });
     });
@@ -657,6 +966,14 @@ test.describe('Mark Done with Node IDs', () => {
 
   test('handles REST API errors for node IDs gracefully', async ({ page }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       route.fulfill({ status: 500 });
     });
 
@@ -670,6 +987,14 @@ test.describe('Mark Done with Node IDs', () => {
 
   test('removes notification after successful REST API mark done with node ID', async ({ page }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       route.fulfill({ status: 204 });
     });
 

@@ -2,6 +2,12 @@ import { test, expect } from '@playwright/test';
 import { clearAppStorage, seedCommentCache } from './storage-utils';
 import mixedFixture from '../fixtures/notifications_mixed.json';
 
+const THREAD_SYNC_PAYLOAD = {
+  updated_at: '2000-01-01T00:00:00Z',
+  last_read_at: null,
+  unread: true,
+};
+
 test.describe('Keyboard Shortcuts', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/github/rest/user', (route) => {
@@ -84,6 +90,14 @@ test.describe('Keyboard Shortcuts', () => {
 
   test('e marks the active notification as done', async ({ page }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       route.fulfill({ status: 204 });
     });
 
@@ -102,6 +116,14 @@ test.describe('Keyboard Shortcuts', () => {
       }
     );
     await page.route('**/github/rest/notifications/threads/**', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       route.fulfill({ status: 204 });
     });
 
@@ -132,6 +154,14 @@ test.describe('Keyboard Shortcuts', () => {
     page,
   }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       route.fulfill({ status: 204 });
     });
 
@@ -160,6 +190,14 @@ test.describe('Keyboard Shortcuts', () => {
     page,
   }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       route.fulfill({ status: 204 });
     });
 

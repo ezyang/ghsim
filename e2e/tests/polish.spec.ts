@@ -2,6 +2,12 @@ import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
 import { clearAppStorage } from './storage-utils';
 
+const THREAD_SYNC_PAYLOAD = {
+  updated_at: '2000-01-01T00:00:00Z',
+  last_read_at: null,
+  unread: true,
+};
+
 /**
  * Phase 8: Polish Tests
  *
@@ -186,6 +192,14 @@ test.describe('Polish', () => {
 
     test('no confirmation for small number of items', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 205 });
       });
 
@@ -227,6 +241,22 @@ test.describe('Polish', () => {
       await expect(page.locator('#status-bar')).toContainText('Synced 15 notifications');
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+
+        if (route.request().method() === 'GET') {
+
+          route.fulfill({
+
+            status: 200,
+
+            contentType: 'application/json',
+
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+          });
+
+          return;
+
+        }
         route.fulfill({ status: 205 });
       });
 
@@ -300,6 +330,14 @@ test.describe('Polish', () => {
 
     test('checkboxes are disabled during Mark Done operation', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         await new Promise((r) => setTimeout(r, 300));
         route.fulfill({ status: 205 });
       });
@@ -323,6 +361,14 @@ test.describe('Polish', () => {
 
     test('checkboxes are re-enabled after Mark Done completes', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
+        if (route.request().method() === 'GET') {
+          route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+          });
+          return;
+        }
         route.fulfill({ status: 205 });
       });
 

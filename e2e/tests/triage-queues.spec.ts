@@ -5,6 +5,12 @@ import {
   seedCommentCache,
 } from './storage-utils';
 
+const THREAD_SYNC_PAYLOAD = {
+  updated_at: '2000-01-01T00:00:00Z',
+  last_read_at: null,
+  unread: true,
+};
+
 const notificationsResponse = {
   source_url: 'https://github.com/notifications?query=repo:test/repo',
   generated_at: '2025-01-02T00:00:00Z',
@@ -164,6 +170,14 @@ test.describe('Triage queues', () => {
       }
     );
     await page.route('**/github/rest/notifications/threads/thread-pr-2', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       markDoneCalled = route.request().method() === 'DELETE';
       route.fulfill({ status: 204, body: '' });
     });
@@ -198,6 +212,14 @@ test.describe('Triage queues', () => {
       }
     );
     await page.route('**/github/rest/notifications/threads/thread-pr-2', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       markDoneCalled = route.request().method() === 'DELETE';
       route.fulfill({ status: 204, body: '' });
     });
@@ -292,6 +314,14 @@ test.describe('Triage queues', () => {
       }
     );
     await page.route('**/github/rest/notifications/threads/thread-pr-2', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       markDoneCalled = route.request().method() === 'DELETE';
       route.fulfill({ status: 204, body: '' });
     });

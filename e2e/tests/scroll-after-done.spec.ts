@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { clearAppStorage } from './storage-utils';
 
+const THREAD_SYNC_PAYLOAD = {
+  updated_at: '2000-01-01T00:00:00Z',
+  last_read_at: null,
+  unread: true,
+};
+
 // Fixture with a first notification that has many comments to make it tall
 const fixtureWithManyComments = {
   source_url: 'https://github.com/notifications?query=repo:test/repo',
@@ -239,6 +245,14 @@ test.describe('Scroll After Done', () => {
 
     // Mock the mark done API
     await page.route('**/github/rest/notifications/threads/**', (route) => {
+      if (route.request().method() === 'GET') {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+        });
+        return;
+      }
       route.fulfill({ status: 204 });
     });
 

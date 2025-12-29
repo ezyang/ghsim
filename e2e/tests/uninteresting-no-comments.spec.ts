@@ -1,6 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { clearAppStorage, seedCommentCache } from './storage-utils';
 
+const THREAD_SYNC_PAYLOAD = {
+  updated_at: '2000-01-01T00:00:00Z',
+  last_read_at: null,
+  unread: true,
+};
+
 const notificationsResponse = {
   source_url: 'https://github.com/notifications?query=repo:test/repo',
   generated_at: '2025-01-02T00:00:00Z',
@@ -108,6 +114,22 @@ test.describe.skip('Uninteresting without new comments', () => {
     const apiCalls: string[] = [];
 
     await page.route('**/github/rest/notifications/threads/**', (route) => {
+
+      if (route.request().method() === 'GET') {
+
+        route.fulfill({
+
+          status: 200,
+
+          contentType: 'application/json',
+
+          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
+
+        });
+
+        return;
+
+      }
       apiCalls.push(route.request().url());
       route.fulfill({ status: 204 });
     });
