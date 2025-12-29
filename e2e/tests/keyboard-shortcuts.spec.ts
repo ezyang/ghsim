@@ -8,6 +8,32 @@ const THREAD_SYNC_PAYLOAD = {
   unread: true,
 };
 
+async function waitForScrollSettled(
+  page,
+  { timeoutMs = 1000, intervalMs = 50, settleMs = 200 } = {}
+) {
+  let last = await page.evaluate(() => window.scrollY);
+  let stableFor = 0;
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    await page.waitForTimeout(intervalMs);
+    const current = await page.evaluate(() => window.scrollY);
+
+    if (Math.abs(current - last) < 1) {
+      stableFor += intervalMs;
+      if (stableFor >= settleMs) {
+        return current;
+      }
+    } else {
+      stableFor = 0;
+      last = current;
+    }
+  }
+
+  return page.evaluate(() => window.scrollY);
+}
+
 test.describe('Keyboard Shortcuts', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/github/rest/user', (route) => {
@@ -313,16 +339,14 @@ test.describe('Keyboard Shortcuts', () => {
 
     // First scroll down
     await page.keyboard.press('Shift+G');
-    await page.waitForTimeout(200); // Wait for scroll animation
-    const scrollTopBefore = await page.evaluate(() => window.scrollY);
+    const scrollTopBefore = await waitForScrollSettled(page);
     expect(scrollTopBefore).toBeGreaterThan(0);
 
     // Press g once and wait
     await page.keyboard.press('g');
-    await page.waitForTimeout(600); // Wait longer than the 500ms timeout
+    const scrollTopAfter = await waitForScrollSettled(page, { timeoutMs: 1200 });
 
     // Scroll position should not have changed
-    const scrollTopAfter = await page.evaluate(() => window.scrollY);
     expect(scrollTopAfter).toBe(scrollTopBefore);
   });
 

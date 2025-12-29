@@ -64,7 +64,8 @@ test.describe('UI Shell', () => {
     await expect(page.locator('#repo-input')).toHaveAttribute('placeholder', 'owner/repo');
     await expect(page.locator('#sync-btn')).toHaveText('Quick Sync');
     await expect(page.locator('#rate-limit-box')).toContainText('Rate limit: core 42/60');
-    await expect(page.locator('#rate-limit-box')).toContainText('graphql 4999/5000');
+    // GraphQL rate limit is not fetched on init to save rate limit; shows 'unknown' until first sync
+    await expect(page.locator('#rate-limit-box')).toContainText('graphql unknown');
     await expect(page.locator('#notifications-list')).toHaveAttribute('role', 'list');
     await expect(page.locator('#empty-state')).toContainText('No notifications');
   });
@@ -131,6 +132,14 @@ test.describe('Sync Button', () => {
 });
 
 test.describe('Auth Status', () => {
+  test.beforeEach(async ({ page }) => {
+    // Clear localStorage to ensure fresh auth check (auth is cached with TTL)
+    await page.addInitScript(() => {
+      localStorage.clear();
+      indexedDB.deleteDatabase('ghnotif_cache');
+    });
+  });
+
   test('shows authenticated state when user is logged in', async ({ page }) => {
     await page.route('**/github/rest/user', (route) => {
       route.fulfill({

@@ -57,12 +57,12 @@ test.describe('Rate limit explain logs', () => {
 
     await expect(page.locator('#rate-limit-details')).toBeVisible();
     await expect(page.locator('#rate-limit-log-status')).toContainText('Logged');
-    await expect(page.locator('#rate-limit-log li')).toHaveCount(3);
+    // Only 2 calls on init: /user and /rate_limit; graphql rate limit call is skipped to save rate limit
+    await expect(page.locator('#rate-limit-log li')).toHaveCount(2);
 
     const log = page.locator('#rate-limit-log');
     await expect(log).toContainText('/github/rest/user');
     await expect(log).toContainText('/github/rest/rate_limit');
-    await expect(log).toContainText('/github/graphql');
   });
 });
 

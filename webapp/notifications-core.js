@@ -615,9 +615,10 @@
                 }
             });
 
-            // Check auth status
+            // Check auth status (uses cached value if available)
             checkAuth();
-            refreshRateLimit();
+            // Only refresh REST rate limit on init (it's free); skip GraphQL to save rate limit
+            refreshRateLimit({ skipGraphql: true });
 
             // Initial render
             render();

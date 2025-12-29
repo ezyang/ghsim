@@ -88,9 +88,14 @@
             }
         }
 
-        async function refreshRateLimit() {
+        async function refreshRateLimit({ skipGraphql = false } = {}) {
             state.rateLimitLogRefreshStart = Date.now();
-            await Promise.all([refreshRestRateLimit(), refreshGraphqlRateLimit()]);
+            // REST /rate_limit is free; GraphQL rateLimit query costs 1 point
+            const tasks = [refreshRestRateLimit()];
+            if (!skipGraphql) {
+                tasks.push(refreshGraphqlRateLimit());
+            }
+            await Promise.all(tasks);
             updateRateLimitBox();
             updateRateLimitLogStatus();
             state.rateLimitLogRefreshStart = null;
@@ -542,7 +547,52 @@
             });
         }
         // Check authentication status
-        async function checkAuth() {
+        const AUTH_CACHE_KEY = 'ghnotif_auth_cache';
+        const AUTH_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+        function getCachedAuth() {
+            try {
+                const raw = localStorage.getItem(AUTH_CACHE_KEY);
+                if (!raw) return null;
+                const cached = JSON.parse(raw);
+                if (Date.now() - cached.timestamp > AUTH_CACHE_TTL_MS) {
+                    return null;
+                }
+                return cached;
+            } catch {
+                return null;
+            }
+        }
+
+        function setCachedAuth(login) {
+            try {
+                localStorage.setItem(AUTH_CACHE_KEY, JSON.stringify({
+                    login,
+                    timestamp: Date.now(),
+                }));
+            } catch {
+                // Ignore storage errors
+            }
+        }
+
+        async function checkAuth({ force = false } = {}) {
+            // Use cached auth if available and not forcing refresh
+            if (!force) {
+                const cached = getCachedAuth();
+                if (cached) {
+                    if (cached.login) {
+                        elements.authStatus.textContent = `Signed in as ${cached.login}`;
+                        elements.authStatus.className = 'auth-status authenticated';
+                        state.currentUserLogin = cached.login;
+                    } else {
+                        elements.authStatus.textContent = 'Not authenticated';
+                        elements.authStatus.className = 'auth-status error';
+                        state.currentUserLogin = null;
+                    }
+                    return;
+                }
+            }
+
             try {
                 const response = await fetch('/github/rest/user');
                 const data = await response.json();
@@ -551,10 +601,12 @@
                     elements.authStatus.textContent = `Signed in as ${data.login}`;
                     elements.authStatus.className = 'auth-status authenticated';
                     state.currentUserLogin = data.login;
+                    setCachedAuth(data.login);
                 } else {
                     elements.authStatus.textContent = 'Not authenticated';
                     elements.authStatus.className = 'auth-status error';
                     state.currentUserLogin = null;
+                    setCachedAuth(null);
                 }
             } catch (e) {
                 elements.authStatus.textContent = 'Auth check failed';
