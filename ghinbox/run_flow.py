@@ -8,6 +8,7 @@ Available flows:
     basic             - Basic notification generation test
     comment_fetch_marks_read - Check if API comment fetch flips read state
     comment_prefetch_validation - Validate last_read_at for comment prefetching
+    done_then_close   - Test timestamp behavior when done notification returns after close
     notification_timestamps - Probe notification timestamp meaning and event loading
     pagination        - Generate 26+ notifications to test pagination
     prod_notifications_snapshot - Capture notifications HTML/JSON without side effects
@@ -23,6 +24,7 @@ from ghinbox.flows import (
     BasicNotificationFlow,
     CommentFetchMarksReadFlow,
     CommentPrefetchValidationFlow,
+    DoneThenCloseFlow,
     NotificationTimestampsFlow,
     PaginationFlow,
     ParserValidationFlow,
@@ -36,6 +38,7 @@ FLOWS = {
     "basic": BasicNotificationFlow,
     "comment_fetch_marks_read": CommentFetchMarksReadFlow,
     "comment_prefetch_validation": CommentPrefetchValidationFlow,
+    "done_then_close": DoneThenCloseFlow,
     "notification_timestamps": NotificationTimestampsFlow,
     "pagination": PaginationFlow,
     "read_vs_done": ReadVsDoneFlow,
@@ -54,6 +57,7 @@ Available flows:
   basic             - Basic notification generation and visibility test
   comment_fetch_marks_read - Check if API comment fetch flips read state
   comment_prefetch_validation - Validate last_read_at for comment prefetching
+  done_then_close   - Test timestamp behavior when done notification returns after close
   notification_timestamps - Probe notification timestamp meaning and event loading
   pagination        - Generate 26+ notifications to test pagination
   prod_notifications_snapshot - Capture notifications HTML/JSON without side effects

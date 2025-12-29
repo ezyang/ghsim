@@ -239,6 +239,10 @@ class GitHubAPI:
             f"/repos/{owner}/{repo}/issues/{number}/comments", {"body": body}
         )
 
+    def close_issue(self, owner: str, repo: str, number: int) -> Any:
+        """Close an issue."""
+        return self.patch(f"/repos/{owner}/{repo}/issues/{number}", {"state": "closed"})
+
     def graphql(self, query: str, variables: dict | None = None) -> Any:
         """Execute a GraphQL query."""
         url = "https://api.github.com/graphql"
