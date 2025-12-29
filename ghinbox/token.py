@@ -11,6 +11,7 @@ import sys
 import time
 from pathlib import Path
 
+import httpx
 from playwright.sync_api import sync_playwright, Page
 
 from ghinbox.auth import (
@@ -44,6 +45,40 @@ def load_token(account: str) -> str | None:
     if token_path.exists():
         return token_path.read_text().strip()
     return None
+
+
+def verify_token(account: str) -> tuple[bool, str | None]:
+    """
+    Verify that the stored token for an account is valid by calling GitHub's API.
+
+    Args:
+        account: The account identifier
+
+    Returns:
+        Tuple of (is_valid, github_login). If invalid, github_login is None.
+    """
+    token = load_token(account)
+    if not token:
+        return False, None
+
+    try:
+        response = httpx.get(
+            "https://api.github.com/user",
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/vnd.github+json",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+            timeout=10.0,
+        )
+        if response.status_code == 200:
+            data = response.json()
+            return True, data.get("login")
+        else:
+            return False, None
+    except httpx.RequestError:
+        # Network error - can't verify, assume invalid
+        return False, None
 
 
 def save_token(account: str, token: str) -> Path:

@@ -20,7 +20,7 @@ from ghinbox.auth import (
     load_username,
     DEFAULT_ACCOUNT,
 )
-from ghinbox.token import has_token, provision_token
+from ghinbox.token import has_token, provision_token, verify_token
 
 
 def setup_default_account(headed: bool = False) -> tuple[bool, str | None]:
@@ -160,6 +160,32 @@ def main() -> int:
                     print(f"WARNING: No token for account '{account}'")
                     print(f"Run: python -m ghinbox.token {account}")
                     print("API proxy features will not work without a token.\n")
+
+        # Verify the token actually works
+        if has_token(account):
+            print("Verifying GitHub token...")
+            is_valid, github_login = verify_token(account)
+            if not is_valid:
+                print("Token is invalid or expired.")
+                if account == DEFAULT_ACCOUNT:
+                    print("Re-provisioning token (browser window will open)...")
+                    token = provision_token(
+                        account, force=True, headless=False, prod=True
+                    )
+                    if not token:
+                        print("ERROR: Token re-provisioning failed")
+                        return 1
+                    # Verify the new token
+                    is_valid, github_login = verify_token(account)
+                    if not is_valid:
+                        print("ERROR: New token verification failed")
+                        return 1
+                    print(f"Token verified for GitHub user: {github_login}")
+                else:
+                    print(f"Run: python -m ghinbox.token {account} --force")
+                    return 1
+            else:
+                print(f"Token verified for GitHub user: {github_login}")
 
         # Show account info
         username = load_username(account)
