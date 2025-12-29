@@ -201,9 +201,7 @@ test.describe('Comment visibility', () => {
     expect(maxWidth).toBe('1200px');
   });
 
-  test('renders markdown images at natural size with scrollable overflow', async ({
-    page,
-  }) => {
+  test('scales markdown images to fit the comment width', async ({ page }) => {
     await page.evaluate(() => {
       const body = document.querySelector('.comment-body.markdown-body');
       if (!body) {
@@ -217,18 +215,21 @@ test.describe('Comment visibility', () => {
       body.appendChild(img);
     });
 
-    const commentBody = page.locator('.comment-body.markdown-body').first();
-    const overflowX = await commentBody.evaluate((element) => {
-      return window.getComputedStyle(element).overflowX;
-    });
-    expect(overflowX).toBe('auto');
-
     const image = page.locator('.comment-body.markdown-body img').last();
     await expect(image).toBeVisible();
-    const maxWidth = await image.evaluate((element) => {
-      return window.getComputedStyle(element).maxWidth;
+    const sizes = await image.evaluate((element) => {
+      const img = element as HTMLImageElement;
+      const container = img.closest('.comment-body.markdown-body') as HTMLElement | null;
+      return {
+        imgWidth: img.clientWidth,
+        imgHeight: img.clientHeight,
+        containerWidth: container?.clientWidth ?? 0,
+      };
     });
-    expect(maxWidth).toBe('none');
+    expect(sizes.imgWidth).toBeGreaterThan(0);
+    expect(sizes.containerWidth).toBeGreaterThan(0);
+    expect(sizes.imgWidth).toBeLessThanOrEqual(sizes.containerWidth + 1);
+    expect(Math.abs(sizes.imgHeight - sizes.imgWidth * 0.75)).toBeLessThanOrEqual(2);
   });
 
   test('notification header has sticky positioning when comments are expanded', async ({

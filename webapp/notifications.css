@@ -866,7 +866,11 @@
 
         .subfilter-stack {
             display: flex;
-            flex-direction: column;
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            padding: 8px var(--notifications-padding);
         }
 
         .order-control {

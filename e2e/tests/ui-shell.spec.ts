@@ -40,6 +40,22 @@ test.describe('UI Shell', () => {
       });
     });
 
+    await page.route('**/github/graphql', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            rateLimit: {
+              remaining: 4999,
+              limit: 5000,
+              resetAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+            },
+          },
+        }),
+      });
+    });
+
     await page.goto('notifications.html');
   });
 
@@ -48,6 +64,7 @@ test.describe('UI Shell', () => {
     await expect(page.locator('#repo-input')).toHaveAttribute('placeholder', 'owner/repo');
     await expect(page.locator('#sync-btn')).toHaveText('Quick Sync');
     await expect(page.locator('#rate-limit-box')).toContainText('Rate limit: core 42/60');
+    await expect(page.locator('#rate-limit-box')).toContainText('graphql 4999/5000');
     await expect(page.locator('#notifications-list')).toHaveAttribute('role', 'list');
     await expect(page.locator('#empty-state')).toContainText('No notifications');
   });

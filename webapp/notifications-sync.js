@@ -37,7 +37,7 @@
             );
         }
 
-        async function refreshRateLimit() {
+        async function refreshRestRateLimit() {
             try {
                 const response = await fetch('/github/rest/rate_limit');
                 if (!response.ok) {
@@ -49,6 +49,33 @@
             } catch (error) {
                 state.rateLimitError = error.message || String(error);
             }
+        }
+
+        async function refreshGraphqlRateLimit() {
+            try {
+                const data = await fetchGraphqlForSync(
+                    `
+                        query {
+                            rateLimit {
+                                limit
+                                remaining
+                                resetAt
+                            }
+                        }
+                    `,
+                    {}
+                );
+                if (!data?.rateLimit) {
+                    updateGraphqlRateLimit(null);
+                }
+                setGraphqlRateLimitError(null);
+            } catch (error) {
+                setGraphqlRateLimitError(error.message || String(error));
+            }
+        }
+
+        async function refreshRateLimit() {
+            await Promise.all([refreshRestRateLimit(), refreshGraphqlRateLimit()]);
             updateRateLimitBox();
         }
 
