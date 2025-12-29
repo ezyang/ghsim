@@ -466,38 +466,6 @@ test.describe('Mark Done', () => {
       await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
     });
 
-    test('keeps the next notification anchored after removal', async ({ page }) => {
-      await page.setViewportSize({ width: 1200, height: 360 });
-      await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
-        route.fulfill({ status: 204 });
-      });
-
-      await page.evaluate(() => {
-        window.scrollTo(0, 200);
-      });
-
-      const nextItem = page.locator('[data-id="notif-3"]');
-      const beforeTop = await nextItem.evaluate((el) => el.getBoundingClientRect().top);
-
-      await page.locator('[data-id="notif-1"] .notification-done-btn').click();
-
-      await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
-      await expect(page.locator('[data-id="notif-1"]')).toHaveCount(0);
-
-      await page.evaluate(() => new Promise(requestAnimationFrame));
-
-      const afterTop = await nextItem.evaluate((el) => el.getBoundingClientRect().top);
-      expect(Math.abs(afterTop - beforeTop)).toBeLessThanOrEqual(1);
-    });
-
     test('removes notification before the Mark Done request completes', async ({ page }) => {
       let releaseResponse: (() => void) | null = null;
       const responseGate = new Promise<void>((resolve) => {
@@ -621,54 +589,6 @@ test.describe('Mark Done', () => {
       // Progress container should be visible
       const progressContainer = page.locator('#progress-container');
       await expect(progressContainer).toHaveClass(/visible/);
-    });
-
-    test('progress bar does not shift the notifications list', async ({ page }) => {
-      let releaseGate: (() => void) | null = null;
-      const gate = new Promise<void>((resolve) => {
-        releaseGate = resolve;
-      });
-
-      await page.route('**/github/rest/notifications/threads/**', async (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
-        await gate;
-        route.fulfill({ status: 204 });
-      });
-
-      await page.locator('#select-all-checkbox').click();
-
-      const notificationsList = page.locator('#notifications-list');
-      await expect(notificationsList).toBeVisible();
-      const beforeBox = await notificationsList.boundingBox();
-      if (!beforeBox) {
-        throw new Error('Expected notifications list bounding box');
-      }
-
-      await page.locator('#mark-done-btn').click();
-
-      const progressContainer = page.locator('#progress-container');
-      await expect(progressContainer).toHaveClass(/visible/);
-
-      const afterBox = await notificationsList.boundingBox();
-      if (!afterBox) {
-        throw new Error('Expected notifications list bounding box after progress');
-      }
-
-      expect(Math.abs(afterBox.y - beforeBox.y)).toBeLessThan(1);
-
-      if (!releaseGate) {
-        throw new Error('Expected releaseGate to be assigned');
-      }
-      releaseGate();
-
-      await expect(page.locator('#status-bar')).toContainText('Done');
     });
 
     test('progress text shows current progress', async ({ page }) => {

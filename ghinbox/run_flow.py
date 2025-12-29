@@ -21,6 +21,7 @@ import argparse
 import sys
 
 from ghinbox.flows import (
+    AnchorTrackingFlow,
     BasicNotificationFlow,
     CommentFetchMarksReadFlow,
     CommentPrefetchValidationFlow,
@@ -35,6 +36,7 @@ from ghinbox.flows import (
 
 
 FLOWS = {
+    "anchor_tracking": AnchorTrackingFlow,
     "basic": BasicNotificationFlow,
     "comment_fetch_marks_read": CommentFetchMarksReadFlow,
     "comment_prefetch_validation": CommentPrefetchValidationFlow,

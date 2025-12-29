@@ -968,7 +968,9 @@
             }
 
             // Show/hide select all row
-            const showSelectAll = filteredNotifications.length > 0;
+            const showSelectAll =
+                filteredNotifications.length > 0 ||
+                (state.markingInProgress && state.markProgress.total > 0);
             elements.selectAllRow.style.display = showSelectAll ? 'flex' : 'none';
 
             // Update select all checkbox state
