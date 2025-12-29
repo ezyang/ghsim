@@ -11,6 +11,7 @@ Available flows:
     notification_timestamps - Probe notification timestamp meaning and event loading
     pagination        - Generate 26+ notifications to test pagination
     prod_notifications_snapshot - Capture notifications HTML/JSON without side effects
+    prod_undo         - Verify undo restores a done notification
     read_vs_done      - Test read vs done state visibility in API
     parser_validation - Validate HTML parser against API notifications
 """
@@ -26,6 +27,7 @@ from ghinbox.flows import (
     PaginationFlow,
     ParserValidationFlow,
     ProdNotificationsSnapshotFlow,
+    ProdUndoFlow,
     ReadVsDoneFlow,
 )
 
@@ -39,6 +41,7 @@ FLOWS = {
     "read_vs_done": ReadVsDoneFlow,
     "parser_validation": ParserValidationFlow,
     "prod_notifications_snapshot": ProdNotificationsSnapshotFlow,
+    "prod_undo": ProdUndoFlow,
 }
 
 
@@ -54,6 +57,7 @@ Available flows:
   notification_timestamps - Probe notification timestamp meaning and event loading
   pagination        - Generate 26+ notifications to test pagination
   prod_notifications_snapshot - Capture notifications HTML/JSON without side effects
+  prod_undo         - Verify undo restores a done notification
   read_vs_done      - Test whether API can distinguish read from done notifications
   parser_validation - Validate HTML parser against API notifications
         """,

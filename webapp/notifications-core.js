@@ -8,7 +8,7 @@
         const DEFAULT_VIEW_FILTERS = {
             'issues': 'all',           // 'all' | 'open' | 'closed'
             'my-prs': 'all',           // 'all' (minimal for now)
-            'others-prs': 'all'        // 'all' | 'needs-review' | 'approved' | 'closed'
+            'others-prs': 'all'        // 'all' | 'needs-review' | 'approved' | 'draft' | 'closed'
         };
 
         // Application state
@@ -33,6 +33,8 @@
             commentCache: loadCommentCache(),
             rateLimit: null,
             rateLimitError: null,
+            graphqlRateLimit: null,
+            graphqlRateLimitError: null,
             currentUserLogin: null,
             commentBodyExpanded: new Set(),
             lastSyncedRepo: null,
@@ -68,6 +70,7 @@
             selectAllCheckbox: document.getElementById('select-all-checkbox'),
             selectionCount: document.getElementById('selection-count'),
             markDoneBtn: document.getElementById('mark-done-btn'),
+            openUnreadBtn: document.getElementById('open-unread-btn'),
             unsubscribeAllBtn: document.getElementById('unsubscribe-all-btn'),
             progressContainer: document.getElementById('progress-container'),
             progressBarFill: document.getElementById('progress-bar-fill'),
@@ -200,6 +203,9 @@
             // Mark Done button handler
             elements.markDoneBtn.addEventListener('click', handleMarkDone);
 
+            // Open All button handler
+            elements.openUnreadBtn.addEventListener('click', handleOpenAllFiltered);
+
             // Unsubscribe All button handler
             elements.unsubscribeAllBtn.addEventListener('click', handleUnsubscribeAll);
 
@@ -275,8 +281,11 @@
 
             // Check if current subfilter requires comment prefetch
             const subfilter = state.viewFilters[view];
-            if (['needs-review', 'approved'].includes(subfilter) && !state.commentPrefetchEnabled) {
+            if (subfilter === 'approved' && !state.commentPrefetchEnabled) {
                 showStatus('Enable comment fetching to evaluate triage filters.', 'info');
+            }
+            if (subfilter === 'committer' || subfilter === 'external') {
+                maybePrefetchReviewMetadata();
             }
             render();
         }
@@ -286,8 +295,11 @@
             state.viewFilters[state.view] = subfilter;
             localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(state.viewFilters));
 
-            if (['needs-review', 'approved'].includes(subfilter) && !state.commentPrefetchEnabled) {
+            if (subfilter === 'approved' && !state.commentPrefetchEnabled) {
                 showStatus('Enable comment fetching to evaluate triage filters.', 'info');
+            }
+            if (subfilter === 'committer' || subfilter === 'external') {
+                maybePrefetchReviewMetadata();
             }
             render();
         }
@@ -336,11 +348,20 @@
                 if (stateFilter === 'closed') {
                     return notifState === 'closed' || notifState === 'merged';
                 }
+                if (stateFilter === 'draft') {
+                    return notifState === 'draft';
+                }
                 if (stateFilter === 'needs-review') {
                     return safeIsNotificationNeedsReview(notif);
                 }
                 if (stateFilter === 'approved') {
                     return safeIsNotificationApproved(notif);
+                }
+                if (stateFilter === 'committer') {
+                    return safeIsNotificationFromCommitter(notif);
+                }
+                if (stateFilter === 'external') {
+                    return safeIsNotificationFromExternal(notif);
                 }
                 return true;
             });
@@ -356,6 +377,34 @@
             return typeof isNotificationApproved === 'function'
                 ? isNotificationApproved(notification)
                 : false;
+        }
+
+        function safeIsNotificationFromCommitter(notification) {
+            return typeof isNotificationFromCommitter === 'function'
+                ? isNotificationFromCommitter(notification)
+                : false;
+        }
+
+        function safeHasNotificationAuthorAssociation(notification) {
+            return typeof hasNotificationAuthorAssociation === 'function'
+                ? hasNotificationAuthorAssociation(notification)
+                : false;
+        }
+
+        function safeIsNotificationFromExternal(notification) {
+            if (notification.subject?.type !== 'PullRequest') {
+                return false;
+            }
+            if (!safeHasNotificationAuthorAssociation(notification)) {
+                return false;
+            }
+            return !safeIsNotificationFromCommitter(notification);
+        }
+
+        function maybePrefetchReviewMetadata() {
+            if (typeof scheduleReviewDecisionPrefetch === 'function') {
+                scheduleReviewDecisionPrefetch(state.notifications);
+            }
         }
 
         // Get filtered notifications based on current view and subfilter
@@ -397,8 +446,11 @@
             let all = viewNotifications.length;
             let open = 0;
             let closed = 0;
+            let draft = 0;
             let needsReview = 0;
             let approved = 0;
+            let committer = 0;
+            let external = 0;
 
             viewNotifications.forEach(notif => {
                 const notifState = notif.subject.state;
@@ -407,15 +459,24 @@
                 } else if (notifState === 'closed' || notifState === 'merged') {
                     closed++;
                 }
+                if (notifState === 'draft') {
+                    draft++;
+                }
                 if (safeIsNotificationNeedsReview(notif)) {
                     needsReview++;
                 }
                 if (safeIsNotificationApproved(notif)) {
                     approved++;
                 }
+                if (safeIsNotificationFromCommitter(notif)) {
+                    committer++;
+                }
+                if (safeIsNotificationFromExternal(notif)) {
+                    external++;
+                }
             });
 
-            return { all, open, closed, needsReview, approved };
+            return { all, open, closed, draft, needsReview, approved, committer, external };
         }
 
         function updateCommentCacheStatus() {
@@ -445,5 +506,5 @@
         // scheduleCommentPrefetch, runCommentQueue, toIssueComment, fetchAllIssueComments,
         // fetchPullRequestReviews, prefetchNotificationComments, getCommentStatus, getCommentItems,
         // filterCommentsAfterOwnComment, isNotificationUninteresting, isNotificationNeedsReview,
-        // isNotificationApproved, hasApprovedReview, isUninterestingComment, isRevertRelated,
+        // isNotificationApproved, isUninterestingComment, isRevertRelated,
         // isBotAuthor, isBotInteractionComment

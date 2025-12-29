@@ -313,10 +313,10 @@ class TestExtractAuthenticityToken:
     def test_tokens_stable_across_fixtures(
         self, notification_before_done_html: str
     ) -> None:
-        """Test that the bulk archive form token is consistent across page loads.
+        """Test that the undo form token is consistent across page loads.
 
         notification_before_done.html and notification_after_done.html are from
-        the same session, so their bulk archive form tokens should match.
+        the same session, so their unarchive form tokens should match.
         """
         token_before = extract_authenticity_token(notification_before_done_html)
 

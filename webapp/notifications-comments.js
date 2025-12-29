@@ -2,11 +2,13 @@
 // Comment prefetching, caching, classification, and display logic
 // This module expects the following globals from notifications-*.js:
 //   state, getNotificationKey, getIssueNumber, parseRepoInput,
-//   showStatus, refreshRateLimit, render, escapeHtml, renderMarkdown, fetchJson
+//   showStatus, refreshRateLimit, updateGraphqlRateLimit, setGraphqlRateLimitError,
+//   render, escapeHtml, renderMarkdown, fetchJson
 
 const COMMENT_CACHE_KEY = 'ghnotif_bulk_comment_cache_v1';
 const COMMENT_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 const COMMENT_CONCURRENCY = 4;
+const REVIEW_DECISION_BATCH_SIZE = 40;
 const COMMENT_PREFETCH_KEY = 'ghnotif_comment_prefetch_enabled';
 const COMMENT_EXPAND_KEY = 'ghnotif_comment_expand_enabled';
 const COMMENT_HIDE_UNINTERESTING_KEY = 'ghnotif_comment_hide_uninteresting';
@@ -39,12 +41,43 @@ function isCommentCacheFresh(cached) {
     return Date.now() - fetchedAtMs < COMMENT_CACHE_TTL_MS;
 }
 
+function isReviewDecisionFresh(cached) {
+    if (!cached || !Object.prototype.hasOwnProperty.call(cached, 'reviewDecision')) {
+        return false;
+    }
+    const fetchedAt = cached.reviewDecisionFetchedAt || cached.fetchedAt;
+    if (!fetchedAt) {
+        return false;
+    }
+    const fetchedAtMs = Date.parse(fetchedAt);
+    if (Number.isNaN(fetchedAtMs)) {
+        return false;
+    }
+    return Date.now() - fetchedAtMs < COMMENT_CACHE_TTL_MS;
+}
+
+function isAuthorAssociationFresh(cached) {
+    if (!cached || !Object.prototype.hasOwnProperty.call(cached, 'authorAssociation')) {
+        return false;
+    }
+    const fetchedAt = cached.authorAssociationFetchedAt || cached.fetchedAt;
+    if (!fetchedAt) {
+        return false;
+    }
+    const fetchedAtMs = Date.parse(fetchedAt);
+    if (Number.isNaN(fetchedAtMs)) {
+        return false;
+    }
+    return Date.now() - fetchedAtMs < COMMENT_CACHE_TTL_MS;
+}
+
 function scheduleCommentPrefetch(notifications) {
     if (!state.commentPrefetchEnabled) {
         return;
     }
+    scheduleReviewDecisionPrefetch(notifications);
     showStatus(
-        `Comment prefetch: queued ${notifications.length} notifications (concurrency ${COMMENT_CONCURRENCY})`,
+        `Prefetch: queued ${notifications.length} notifications (concurrency ${COMMENT_CONCURRENCY})`,
         'info',
         { flash: true }
     );
@@ -60,14 +93,14 @@ async function runCommentQueue() {
     }
     state.commentQueueRunning = true;
     showStatus(
-        `Comment prefetch: starting ${state.commentQueue.length} requests`,
+        `Prefetch: starting ${state.commentQueue.length} requests`,
         'info',
         { flash: true }
     );
     while (state.commentQueue.length) {
         const batch = state.commentQueue.splice(0, COMMENT_CONCURRENCY);
         showStatus(
-            `Comment prefetch: fetching ${batch.length} (remaining ${state.commentQueue.length})`,
+            `Prefetch: fetching ${batch.length} (remaining ${state.commentQueue.length})`,
             'info',
             { flash: true }
         );
@@ -114,15 +147,143 @@ async function fetchAllIssueComments(repo, issueNumber) {
     return comments;
 }
 
-async function fetchPullRequestReviews(repo, issueNumber) {
-    const reviewUrl = `/github/rest/repos/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.repo)}/pulls/${issueNumber}/reviews`;
-    const reviewPayload = await fetchJson(reviewUrl);
-    return Array.isArray(reviewPayload) ? reviewPayload : [];
+async function fetchGraphql(query, variables) {
+    const response = await fetch('/github/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, variables }),
+    });
+    if (!response.ok) {
+        const detail = await response.text();
+        throw new Error(`Request failed: /github/graphql (${response.status}) ${detail}`);
+    }
+    const payload = await response.json();
+    if (payload?.data?.rateLimit) {
+        updateGraphqlRateLimit(payload.data.rateLimit);
+    } else if (payload?.extensions?.rateLimit) {
+        updateGraphqlRateLimit(payload.extensions.rateLimit);
+    }
+    if (Array.isArray(payload?.errors) && payload.errors.length) {
+        const messages = payload.errors
+            .map((error) => error?.message)
+            .filter(Boolean)
+            .join('; ');
+        throw new Error(messages || 'GraphQL request failed');
+    }
+    return payload.data;
+}
+
+function buildReviewDecisionQuery(issueNumbers) {
+    const fields = issueNumbers
+        .map(
+            (issueNumber) =>
+                `pr${issueNumber}: pullRequest(number: ${issueNumber}) { reviewDecision authorAssociation }`
+        )
+        .join('\n');
+    return `
+        query($owner: String!, $name: String!) {
+            rateLimit {
+                limit
+                remaining
+                resetAt
+            }
+            repository(owner: $owner, name: $name) {
+                ${fields}
+            }
+        }
+    `;
+}
+
+function setReviewDecisionCache(notification, reviewDecision, authorAssociation) {
+    const threadId = getNotificationKey(notification);
+    const existing = state.commentCache.threads[threadId] || {};
+    const nowIso = new Date().toISOString();
+    state.commentCache.threads[threadId] = {
+        ...existing,
+        notificationUpdatedAt: notification.updated_at || existing.notificationUpdatedAt,
+        reviewDecision,
+        reviewDecisionFetchedAt: nowIso,
+        authorAssociation,
+        authorAssociationFetchedAt: nowIso,
+    };
+}
+
+async function prefetchReviewDecisions(repo, notifications) {
+    const issueNumbers = notifications
+        .map((notif) => getIssueNumber(notif))
+        .filter((issueNumber) => typeof issueNumber === 'number');
+    if (!issueNumbers.length) {
+        return;
+    }
+    const uniqueNumbers = Array.from(new Set(issueNumbers));
+    try {
+        for (let i = 0; i < uniqueNumbers.length; i += REVIEW_DECISION_BATCH_SIZE) {
+            const batch = uniqueNumbers.slice(i, i + REVIEW_DECISION_BATCH_SIZE);
+            const query = buildReviewDecisionQuery(batch);
+            const data = await fetchGraphql(query, {
+                owner: repo.owner,
+                name: repo.repo,
+            });
+            const repoData = data?.repository || {};
+            const decisions = new Map();
+            batch.forEach((issueNumber) => {
+                const entry = repoData[`pr${issueNumber}`];
+                decisions.set(issueNumber, {
+                    reviewDecision: entry?.reviewDecision ?? null,
+                    authorAssociation: entry?.authorAssociation ?? null,
+                });
+            });
+            notifications.forEach((notif) => {
+                const issueNumber = getIssueNumber(notif);
+                if (!decisions.has(issueNumber)) {
+                    return;
+                }
+                const entry = decisions.get(issueNumber);
+                setReviewDecisionCache(
+                    notif,
+                    entry.reviewDecision,
+                    entry.authorAssociation
+                );
+            });
+        }
+        setGraphqlRateLimitError(null);
+    } catch (error) {
+        setGraphqlRateLimitError(error.message || String(error));
+    }
+}
+
+function scheduleReviewDecisionPrefetch(notifications) {
+    const repo = parseRepoInput(state.repo || state.lastSyncedRepo || '');
+    if (!repo) {
+        return;
+    }
+    const prNotifications = notifications.filter(
+        (notif) => notif.subject?.type === 'PullRequest'
+    );
+    if (!prNotifications.length) {
+        return;
+    }
+    const pending = prNotifications.filter((notif) => {
+        const cached = state.commentCache.threads[getNotificationKey(notif)];
+        return !isReviewDecisionFresh(cached) || !isAuthorAssociationFresh(cached);
+    });
+    if (!pending.length) {
+        return;
+    }
+    showStatus(
+        `Review metadata prefetch: queued ${pending.length} PRs`,
+        'info',
+        { flash: true }
+    );
+    state.commentQueue.push(() => prefetchReviewDecisions(repo, pending));
+    runCommentQueue();
 }
 
 async function prefetchNotificationComments(notification) {
     const threadId = getNotificationKey(notification);
     const cached = state.commentCache.threads[threadId];
+    const existingReviewDecision = cached?.reviewDecision;
+    const existingReviewDecisionFetchedAt = cached?.reviewDecisionFetchedAt;
     const shouldLoadAllComments = Boolean(
         notification.last_read_at_missing || !notification.last_read_at
     );
@@ -144,6 +305,8 @@ async function prefetchNotificationComments(notification) {
             comments: [],
             error: 'No issue number found.',
             fetchedAt: new Date().toISOString(),
+            reviewDecision: existingReviewDecision,
+            reviewDecisionFetchedAt: existingReviewDecisionFetchedAt,
         };
         return;
     }
@@ -156,8 +319,6 @@ async function prefetchNotificationComments(notification) {
         let lastReadAt = null;
         let allComments = false;
         let comments = [];
-        let reviews = [];
-        let reviewsError = null;
         if (shouldLoadAllComments) {
             allComments = true;
             comments = await fetchAllIssueComments(repo, issueNumber);
@@ -172,23 +333,15 @@ async function prefetchNotificationComments(notification) {
                 comments = await fetchJson(commentUrl);
             }
         }
-        if (notification.subject?.type === 'PullRequest') {
-            try {
-                reviews = await fetchPullRequestReviews(repo, issueNumber);
-            } catch (error) {
-                reviewsError = error.message || String(error);
-            }
-        }
-
         state.commentCache.threads[threadId] = {
             notificationUpdatedAt: notification.updated_at,
             lastReadAt,
             unread: notification.unread,
             comments,
             allComments,
-            reviews,
-            reviewsError,
             fetchedAt: new Date().toISOString(),
+            reviewDecision: existingReviewDecision,
+            reviewDecisionFetchedAt: existingReviewDecisionFetchedAt,
         };
     } catch (error) {
         state.commentCache.threads[threadId] = {
@@ -197,6 +350,8 @@ async function prefetchNotificationComments(notification) {
             allComments: shouldLoadAllComments,
             error: error.message || String(error),
             fetchedAt: new Date().toISOString(),
+            reviewDecision: existingReviewDecision,
+            reviewDecisionFetchedAt: existingReviewDecisionFetchedAt,
         };
     }
 }
@@ -310,21 +465,17 @@ function isNotificationUninteresting(notification) {
 }
 
 function isNotificationNeedsReview(notification) {
-    if (!state.commentPrefetchEnabled) {
+    if (notification.subject?.type !== 'PullRequest') {
         return false;
     }
-    if (notification.subject?.type !== 'PullRequest') {
+    const notifState = notification.subject?.state;
+    if (notifState === 'draft' || notifState === 'closed' || notifState === 'merged') {
         return false;
     }
     if (isNotificationApproved(notification)) {
         return false;
     }
-    const cached = state.commentCache.threads[getNotificationKey(notification)];
-    if (!cached || cached.error) {
-        return false;
-    }
-    const comments = cached.comments || [];
-    return comments.length === 0;
+    return true;
 }
 
 function isNotificationApproved(notification) {
@@ -334,33 +485,39 @@ function isNotificationApproved(notification) {
     if (notification.subject?.type !== 'PullRequest') {
         return false;
     }
+    if (notification.subject?.state === 'draft') {
+        return false;
+    }
     const cached = state.commentCache.threads[getNotificationKey(notification)];
     if (!cached || cached.error) {
         return false;
     }
-    const reviews = Array.isArray(cached.reviews) ? cached.reviews : [];
-    return hasApprovedReview(reviews);
+    const decision = String(cached.reviewDecision || '').toUpperCase();
+    return decision === 'APPROVED';
 }
 
-function hasApprovedReview(reviews) {
-    const latestByReviewer = new Map();
-    reviews.forEach((review) => {
-        const login = review?.user?.login;
-        if (!login) {
-            return;
-        }
-        const submittedAt = Date.parse(review.submitted_at || '');
-        const existing = latestByReviewer.get(login);
-        if (!existing || submittedAt > existing.submittedAt) {
-            latestByReviewer.set(login, {
-                submittedAt: Number.isNaN(submittedAt) ? 0 : submittedAt,
-                state: String(review.state || '').toUpperCase(),
-            });
-        }
-    });
-    return Array.from(latestByReviewer.values()).some(
-        (entry) => entry.state === 'APPROVED'
-    );
+function isNotificationFromCommitter(notification) {
+    if (notification.subject?.type !== 'PullRequest') {
+        return false;
+    }
+    const cached = state.commentCache.threads[getNotificationKey(notification)];
+    if (!cached || cached.error) {
+        return false;
+    }
+    const association = String(cached.authorAssociation || '').toUpperCase();
+    const committerAssociations = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);
+    return committerAssociations.has(association);
+}
+
+function hasNotificationAuthorAssociation(notification) {
+    if (notification.subject?.type !== 'PullRequest') {
+        return false;
+    }
+    const cached = state.commentCache.threads[getNotificationKey(notification)];
+    if (!cached || cached.error) {
+        return false;
+    }
+    return Object.prototype.hasOwnProperty.call(cached, 'authorAssociation');
 }
 
 function isUninterestingComment(comment) {

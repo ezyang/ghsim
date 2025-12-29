@@ -106,7 +106,7 @@ test.describe('UI Shell', () => {
     test('shows rate limit info box', async ({ page }) => {
       const rateLimit = page.locator('#rate-limit-box');
       await expect(rateLimit).toBeVisible();
-      await expect(rateLimit).toContainText('Rate limit: 42/60');
+      await expect(rateLimit).toContainText('Rate limit: core 42/60');
     });
 
     test('force refresh button reloads with cache busting', async ({ page }) => {

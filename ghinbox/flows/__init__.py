@@ -11,6 +11,7 @@ from ghinbox.flows.notification_timestamps import NotificationTimestampsFlow
 from ghinbox.flows.pagination import PaginationFlow
 from ghinbox.flows.parser_validation import ParserValidationFlow
 from ghinbox.flows.prod_notifications_snapshot import ProdNotificationsSnapshotFlow
+from ghinbox.flows.prod_undo import ProdUndoFlow
 from ghinbox.flows.read_vs_done import ReadVsDoneFlow
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "PaginationFlow",
     "ParserValidationFlow",
     "ProdNotificationsSnapshotFlow",
+    "ProdUndoFlow",
     "ReadVsDoneFlow",
 ]

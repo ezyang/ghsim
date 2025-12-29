@@ -286,9 +286,33 @@
                     class="subfilter-tab"
                     role="tab"
                     aria-selected="false"
+                    data-subfilter="committer"
+                >
+                    Committers <span class="count">0</span>
+                </button>
+                <button
+                    class="subfilter-tab"
+                    role="tab"
+                    aria-selected="false"
+                    data-subfilter="external"
+                >
+                    External <span class="count">0</span>
+                </button>
+                <button
+                    class="subfilter-tab"
+                    role="tab"
+                    aria-selected="false"
                     data-subfilter="approved"
                 >
                     Approved <span class="count">0</span>
+                </button>
+                <button
+                    class="subfilter-tab"
+                    role="tab"
+                    aria-selected="false"
+                    data-subfilter="draft"
+                >
+                    Draft <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
@@ -311,6 +335,18 @@
                 <span id="selection-count" class="selection-count"></span>
                 <button id="mark-done-btn" class="btn btn-danger" style="display: none;">
                     Mark selected as Done
+                </button>
+                <button
+                    id="open-unread-btn"
+                    class="btn open-unread-btn"
+                    type="button"
+                    aria-label="Open all notifications in this filter"
+                    style="display: none;"
+                >
+                    <svg class="open-unread-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" role="img" aria-hidden="true">
+                        <path d="M3.25 3A2.25 2.25 0 0 0 1 5.25v6.5A2.25 2.25 0 0 0 3.25 14h6.5A2.25 2.25 0 0 0 12 11.75v-2.5a.75.75 0 0 0-1.5 0v2.5a.75.75 0 0 1-.75.75h-6.5a.75.75 0 0 1-.75-.75v-6.5A.75.75 0 0 1 3.25 4.5h2.5a.75.75 0 0 0 0-1.5Zm3.5-1a.75.75 0 0 0 0 1.5h2.69L6.97 5.97a.75.75 0 1 0 1.06 1.06L10.5 4.56v2.69a.75.75 0 0 0 1.5 0V2.75A.75.75 0 0 0 11.25 2h-4.5Z"></path>
+                    </svg>
+                    <span>Open all</span>
                 </button>
                 <button id="unsubscribe-all-btn" class="btn btn-danger" style="display: none;">
                     Unsubscribe from all

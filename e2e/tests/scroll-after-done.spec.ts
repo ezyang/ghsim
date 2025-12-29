@@ -153,15 +153,6 @@ test.describe('Scroll After Done', () => {
       });
     });
 
-    // Mock PR reviews endpoint
-    await page.route('**/github/rest/repos/test/repo/pulls/*/reviews', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([]),
-      });
-    });
-
     // Mock rate limit
     await page.route('**/github/rest/rate_limit', (route) => {
       route.fulfill({
@@ -169,6 +160,26 @@ test.describe('Scroll After Done', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           resources: { core: { limit: 5000, remaining: 4999, reset: 1735300000 } },
+        }),
+      });
+    });
+
+    await page.route('**/github/graphql', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            rateLimit: {
+              limit: 5000,
+              remaining: 4999,
+              resetAt: '2025-01-02T00:00:00Z',
+            },
+            repository: {
+              pr42: { reviewDecision: 'REVIEW_REQUIRED' },
+              pr43: { reviewDecision: 'REVIEW_REQUIRED' },
+            },
+          },
         }),
       });
     });

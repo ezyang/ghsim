@@ -1,21 +1,39 @@
-        function formatRateLimit(rateLimit, error) {
+        function formatRateLimit(rateLimit, error, graphqlRateLimit, graphqlError) {
+            const parts = [];
             if (error) {
-                return `Rate limit error: ${error}`;
+                parts.push(`core error: ${error}`);
+            } else if (rateLimit?.resources?.core) {
+                const core = rateLimit.resources.core;
+                const resetAt = core.reset
+                    ? new Date(core.reset * 1000).toLocaleTimeString()
+                    : 'unknown';
+                parts.push(`core ${core.remaining}/${core.limit} reset @ ${resetAt}`);
+            } else {
+                parts.push('core unknown');
             }
-            if (!rateLimit?.resources?.core) {
-                return 'Rate limit: unknown';
+
+            if (graphqlError) {
+                parts.push(`graphql error: ${graphqlError}`);
+            } else if (graphqlRateLimit) {
+                const resetAt = graphqlRateLimit.resetAt
+                    ? new Date(graphqlRateLimit.resetAt).toLocaleTimeString()
+                    : 'unknown';
+                parts.push(
+                    `graphql ${graphqlRateLimit.remaining}/${graphqlRateLimit.limit} reset @ ${resetAt}`
+                );
+            } else {
+                parts.push('graphql unknown');
             }
-            const core = rateLimit.resources.core;
-            const resetAt = core.reset
-                ? new Date(core.reset * 1000).toLocaleTimeString()
-                : 'unknown';
-            return `Rate limit: ${core.remaining}/${core.limit} reset @ ${resetAt}`;
+
+            return `Rate limit: ${parts.join(' | ')}`;
         }
 
         function updateRateLimitBox() {
             elements.rateLimitBox.textContent = formatRateLimit(
                 state.rateLimit,
-                state.rateLimitError
+                state.rateLimitError,
+                state.graphqlRateLimit,
+                state.graphqlRateLimitError
             );
         }
 
@@ -31,6 +49,17 @@
             } catch (error) {
                 state.rateLimitError = error.message || String(error);
             }
+            updateRateLimitBox();
+        }
+
+        function updateGraphqlRateLimit(rateLimit) {
+            state.graphqlRateLimit = rateLimit || null;
+            state.graphqlRateLimitError = null;
+            updateRateLimitBox();
+        }
+
+        function setGraphqlRateLimitError(error) {
+            state.graphqlRateLimitError = error ? String(error) : null;
             updateRateLimitBox();
         }
 
@@ -438,6 +467,16 @@
 
                 // Save to localStorage
                 persistNotifications();
+
+                const currentSubfilter = state.viewFilters[state.view];
+                if (
+                    currentSubfilter === 'committer' ||
+                    currentSubfilter === 'external'
+                ) {
+                    if (typeof maybePrefetchReviewMetadata === 'function') {
+                        maybePrefetchReviewMetadata();
+                    }
+                }
 
                 if (state.commentPrefetchEnabled) {
                     state.commentQueue = [];

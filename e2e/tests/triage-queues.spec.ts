@@ -92,6 +92,8 @@ test.describe('Triage queues', () => {
           fetchedAt: new Date().toISOString(),
           comments: [],
           reviews: [],
+          reviewDecision: 'REVIEW_REQUIRED',
+          reviewDecisionFetchedAt: new Date().toISOString(),
         },
         'thread-pr-2': {
           notificationUpdatedAt: notificationsResponse.notifications[1].updated_at,
@@ -108,6 +110,8 @@ test.describe('Triage queues', () => {
               user: { login: 'reviewer1' },
             },
           ],
+          reviewDecision: 'APPROVED',
+          reviewDecisionFetchedAt: new Date().toISOString(),
         },
       },
     };
@@ -120,10 +124,15 @@ test.describe('Triage queues', () => {
     await page.goto('notifications.html');
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
-    await expect(page.locator('#status-bar')).toContainText('Synced 2 notifications');
+    await expect
+      .poll(async () => page.evaluate(() => {
+        const raw = localStorage.getItem('ghnotif_notifications');
+        return raw ? JSON.parse(raw).length : 0;
+      }))
+      .toBe(2);
   });
 
-  test('routes PRs without comments to needs review', async ({ page }) => {
+  test('routes open, non-approved PRs to needs review', async ({ page }) => {
     // Switch to Others' PRs view
     await page.locator('#view-others-prs').click();
 
@@ -281,5 +290,94 @@ test.describe('Triage queues', () => {
     // Visible in Approved subfilter
     await othersPrsSubfilters.locator('[data-subfilter="approved"]').click();
     await expect(unsubscribeAllBtn).toBeVisible();
+  });
+});
+
+test.describe('Triage queues GraphQL review decisions', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/github/rest/user', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ login: 'testuser' }),
+      });
+    });
+
+    await page.route('**/github/rest/rate_limit', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          rate: { limit: 5000, remaining: 4999, reset: 0 },
+          resources: {},
+        }),
+      });
+    });
+
+    await page.route('**/notifications/html/repo/test/repo', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(notificationsResponse),
+      });
+    });
+
+    await page.route('**/github/rest/repos/test/repo/issues/*/comments*', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route('**/github/graphql', async (route) => {
+      const payload = route.request().postDataJSON();
+      if (payload?.query?.includes('repository')) {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              rateLimit: {
+                limit: 5000,
+                remaining: 4999,
+                resetAt: '2025-01-02T00:00:00Z',
+              },
+              repository: {
+                pr1: { reviewDecision: 'REVIEW_REQUIRED' },
+                pr2: { reviewDecision: 'APPROVED' },
+              },
+            },
+          }),
+        });
+        return;
+      }
+      route.fulfill({ status: 400, contentType: 'application/json', body: '{}' });
+    });
+
+    await page.addInitScript(() => {
+      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
+    });
+
+    await page.goto('notifications.html');
+    await page.locator('#repo-input').fill('test/repo');
+    await page.locator('#sync-btn').click();
+    await expect
+      .poll(async () => page.evaluate(() => {
+        const raw = localStorage.getItem('ghnotif_notifications');
+        return raw ? JSON.parse(raw).length : 0;
+      }))
+      .toBe(2);
+  });
+
+  test('approved queue uses GraphQL review decisions', async ({ page }) => {
+    await page.locator('#view-others-prs').click();
+
+    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    await expect(othersPrsSubfilters.locator('[data-subfilter="approved"] .count')).toHaveText('1');
+    await othersPrsSubfilters.locator('[data-subfilter="approved"]').click();
+
+    await expect(page.locator('.notification-item')).toHaveCount(1);
+    await expect(page.locator('[data-id="thread-pr-2"]')).toBeVisible();
   });
 });

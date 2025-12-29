@@ -391,13 +391,14 @@
                 };
             }
 
+            if (subfilter === 'draft') {
+                return {
+                    title: `No draft ${viewLabel} notifications`,
+                    message: `All ${viewLabel} notifications in this view are ready for review.`,
+                };
+            }
+
             if (subfilter === 'needs-review') {
-                if (!state.commentPrefetchEnabled) {
-                    return {
-                        title: 'Comment fetching disabled',
-                        message: 'Enable comment fetching to evaluate triage filters.',
-                    };
-                }
                 return {
                     title: 'No PRs need review',
                     message: 'No PRs need your review right now.',
@@ -414,6 +415,20 @@
                 return {
                     title: 'No approved PRs',
                     message: 'No approved PR notifications are pending.',
+                };
+            }
+
+            if (subfilter === 'committer') {
+                return {
+                    title: 'No committer PRs',
+                    message: 'No pull requests from repository committers match this view.',
+                };
+            }
+
+            if (subfilter === 'external') {
+                return {
+                    title: 'No external PRs',
+                    message: 'No pull requests from external contributors match this view.',
                 };
             }
 
@@ -614,6 +629,16 @@
                 // Save to localStorage
                 persistNotifications();
 
+                const currentSubfilter = state.viewFilters[state.view];
+                if (
+                    currentSubfilter === 'committer' ||
+                    currentSubfilter === 'external'
+                ) {
+                    if (typeof maybePrefetchReviewMetadata === 'function') {
+                        maybePrefetchReviewMetadata();
+                    }
+                }
+
                 if (state.commentPrefetchEnabled) {
                     state.commentQueue = [];
                     scheduleCommentPrefetch(notifications);
@@ -806,8 +831,11 @@
                         if (subfilter === 'all') countSpan.textContent = subfilterCounts.all;
                         else if (subfilter === 'open') countSpan.textContent = subfilterCounts.open;
                         else if (subfilter === 'closed') countSpan.textContent = subfilterCounts.closed;
+                        else if (subfilter === 'draft') countSpan.textContent = subfilterCounts.draft;
                         else if (subfilter === 'needs-review') countSpan.textContent = subfilterCounts.needsReview;
                         else if (subfilter === 'approved') countSpan.textContent = subfilterCounts.approved;
+                        else if (subfilter === 'committer') countSpan.textContent = subfilterCounts.committer;
+                        else if (subfilter === 'external') countSpan.textContent = subfilterCounts.external;
                     }
                 }
             });
@@ -850,6 +878,9 @@
                 if (markDoneState.show) {
                     elements.markDoneBtn.textContent = markDoneState.label;
                 }
+
+                const openAllState = getOpenAllTargets(filteredNotifications);
+                elements.openUnreadBtn.style.display = openAllState.show ? 'inline-flex' : 'none';
 
                 const unsubscribeAllState = getUnsubscribeAllTargets(filteredNotifications);
                 elements.unsubscribeAllBtn.style.display = unsubscribeAllState.show ? 'inline-block' : 'none';

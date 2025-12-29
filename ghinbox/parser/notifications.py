@@ -126,6 +126,7 @@ def _parse_single_notification(item: Tag) -> Notification | None:
 
     # Extract UI state
     ui = _extract_ui_state(item)
+    ui.action_tokens = _extract_action_tokens(item)
 
     return Notification(
         id=notification_id,
@@ -269,6 +270,28 @@ def _extract_ui_state(item: Tag) -> UIState:
     return UIState(saved=saved, done=done)
 
 
+def _extract_action_tokens(item: Tag) -> dict[str, str]:
+    """Extract per-notification authenticity tokens for actions."""
+    action_map = {
+        "/notifications/beta/archive": "archive",
+        "/notifications/beta/unarchive": "unarchive",
+        "/notifications/beta/subscribe": "subscribe",
+        "/notifications/beta/unsubscribe": "unsubscribe",
+    }
+    tokens: dict[str, str] = {}
+    for action_path, key in action_map.items():
+        form = item.select_one(f'form[action="{action_path}"]')
+        if not form:
+            continue
+        token_input = form.select_one('input[name="authenticity_token"]')
+        if not token_input:
+            continue
+        value = token_input.get("value")
+        if isinstance(value, str):
+            tokens[key] = value
+    return tokens
+
+
 def _parse_pagination(soup: BeautifulSoup) -> Pagination:
     """Parse pagination information from the page."""
     before_cursor: str | None = None
@@ -327,9 +350,9 @@ def _extract_authenticity_token(soup: BeautifulSoup) -> str | None:
     """
     Extract an authenticity_token from a parsed notifications page.
 
-    GitHub includes CSRF tokens in forms. Any token from the page can be used
-    for form submissions within the same session. We look for the bulk archive
-    form's token as it's reliably present.
+    GitHub includes CSRF tokens in forms. We prefer the token used for
+    undo-capable actions (unarchive/subscribe) since those are required
+    for in-app undo requests.
 
     Args:
         soup: Parsed BeautifulSoup object of the notifications page
@@ -337,7 +360,20 @@ def _extract_authenticity_token(soup: BeautifulSoup) -> str | None:
     Returns:
         The authenticity_token value, or None if not found
     """
-    # Look for the bulk archive form's token (most reliably present)
+    preferred_actions = [
+        "/notifications/beta/unarchive",
+        "/notifications/beta/subscribe",
+    ]
+    for action in preferred_actions:
+        action_form = soup.select_one(f'form[action="{action}"]')
+        if action_form:
+            token_input = action_form.select_one('input[name="authenticity_token"]')
+            if token_input:
+                value = token_input.get("value")
+                if isinstance(value, str):
+                    return value
+
+    # Fallback: try the bulk archive form's token (reliably present)
     bulk_form = soup.select_one('form[action="/notifications/beta/archive"]')
     if bulk_form:
         token_input = bulk_form.select_one('input[name="authenticity_token"]')

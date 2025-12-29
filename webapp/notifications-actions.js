@@ -121,6 +121,16 @@
             return { ids: [], show: false };
         }
 
+        function getOpenAllTargets(notifications = getFilteredNotifications()) {
+            const openableNotifications = notifications.filter(
+                (notif) => notif.subject && notif.subject.url
+            );
+            return {
+                notifications: openableNotifications,
+                show: openableNotifications.length > 0,
+            };
+        }
+
         function updateDoneSnapshotStatus() {
             const pending = state.doneSnapshot.pending;
             const done = state.doneSnapshot.done;
@@ -294,6 +304,32 @@
             requestAnimationFrame(() => {
                 restoreScrollAnchor(scrollAnchor);
             });
+        }
+
+        function handleOpenAllFiltered() {
+            const { notifications, show } = getOpenAllTargets();
+            if (!show) return;
+
+            const urls = Array.from(
+                new Set(notifications.map((notif) => notif.subject.url).filter(Boolean))
+            );
+            if (urls.length === 0) {
+                return;
+            }
+            if (urls.length >= 10) {
+                const confirmed = confirm(
+                    `Open ${urls.length} notifications in new tabs?`
+                );
+                if (!confirmed) return;
+            }
+
+            urls.forEach((url) => {
+                window.open(url, '_blank', 'noopener');
+            });
+            showStatus(
+                `Opened ${urls.length} notification${urls.length !== 1 ? 's' : ''}`,
+                'success'
+            );
         }
 
         async function handleUnsubscribeAll() {
@@ -819,41 +855,87 @@
                 return;
             }
 
-            // Check if we have a token
-            if (!state.authenticity_token) {
-                showStatus('Cannot undo: no authenticity token available. Try syncing first.', 'error');
-                return;
-            }
-
             state.undoInProgress = true;
             showStatus('Undo in progress...', 'info');
 
             try {
                 const action = undoItem.action === 'done' ? 'unarchive' : 'subscribe';
-                const response = await fetch('/notifications/html/action', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        action: action,
-                        notification_ids: undoItem.notifications.map(notification => notification.id),
-                        authenticity_token: state.authenticity_token,
-                    }),
+                const notificationsByToken = new Map();
+                let missingToken = false;
+
+                undoItem.notifications.forEach(notification => {
+                    const token =
+                        notification?.ui?.action_tokens?.[action] ||
+                        state.authenticity_token;
+                    if (!token) {
+                        missingToken = true;
+                        return;
+                    }
+                    const group = notificationsByToken.get(token) || [];
+                    group.push(notification);
+                    notificationsByToken.set(token, group);
                 });
-                await parseUndoResponse(response);
 
-                // Restore notifications to the list in updated_at order
-                restoreNotificationsInOrder(undoItem.notifications);
+                if (missingToken) {
+                    showStatus(
+                        'Cannot undo: no authenticity token available. Try syncing first.',
+                        'error'
+                    );
+                    return;
+                }
 
-                persistNotifications();
-                state.undoStack.pop();
-                const restoredCount = undoItem.notifications.length;
-                showStatus(
-                    `Undo successful: restored ${restoredCount} notification${restoredCount !== 1 ? 's' : ''}`,
-                    'success'
-                );
-                render();
+                const restoredNotifications = [];
+                const failedNotifications = [];
+                let errorDetail = null;
+
+                for (const [token, notifications] of notificationsByToken.entries()) {
+                    try {
+                        const response = await fetch('/notifications/html/action', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                action: action,
+                                notification_ids: notifications.map(
+                                    notification => notification.id
+                                ),
+                                authenticity_token: token,
+                            }),
+                        });
+                        await parseUndoResponse(response);
+                        restoredNotifications.push(...notifications);
+                    } catch (e) {
+                        errorDetail = e.message || String(e);
+                        failedNotifications.push(...notifications);
+                    }
+                }
+
+                if (restoredNotifications.length > 0) {
+                    restoreNotificationsInOrder(restoredNotifications);
+                    persistNotifications();
+                    render();
+                }
+
+                if (failedNotifications.length === 0) {
+                    state.undoStack.pop();
+                    const restoredCount = restoredNotifications.length;
+                    showStatus(
+                        `Undo successful: restored ${restoredCount} notification${
+                            restoredCount !== 1 ? 's' : ''
+                        }`,
+                        'success'
+                    );
+                } else {
+                    updateUndoEntry(undoItem, failedNotifications);
+                    const restoredCount = restoredNotifications.length;
+                    const failedCount = failedNotifications.length;
+                    const detailSuffix = errorDetail ? ` (${errorDetail})` : '';
+                    showStatus(
+                        `Undo failed: restored ${restoredCount}, failed ${failedCount}${detailSuffix}`,
+                        'error'
+                    );
+                }
 
             } catch (e) {
                 const errorDetail = e.message || String(e);

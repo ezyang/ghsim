@@ -2,9 +2,21 @@ import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
 
 // Fixture with authenticity_token included
+const undoToken = 'test-undo-token-12345';
 const fixtureWithToken = {
   ...mixedFixture,
   authenticity_token: 'test-csrf-token-12345',
+  notifications: mixedFixture.notifications.map((notification) => ({
+    ...notification,
+    ui: {
+      ...notification.ui,
+      action_tokens: {
+        ...notification.ui?.action_tokens,
+        unarchive: undoToken,
+        subscribe: undoToken,
+      },
+    },
+  })),
 };
 
 /**
@@ -54,7 +66,7 @@ test.describe('Undo', () => {
         const body = route.request().postDataJSON();
         expect(body.action).toBe('unarchive');
         expect(body.notification_ids).toEqual(['notif-1']);
-        expect(body.authenticity_token).toBe('test-csrf-token-12345');
+        expect(body.authenticity_token).toBe(undoToken);
         route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -203,7 +215,7 @@ test.describe('Undo', () => {
     test('undo after reload uses persisted authenticity token', async ({ page }) => {
       await page.route('**/notifications/html/action', (route) => {
         const body = route.request().postDataJSON();
-        expect(body.authenticity_token).toBe('test-csrf-token-12345');
+        expect(body.authenticity_token).toBe(undoToken);
         route.fulfill({
           status: 200,
           contentType: 'application/json',
@@ -251,7 +263,8 @@ test.describe('Undo', () => {
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       await page.keyboard.press('u');
-      await expect(page.locator('#status-bar')).toContainText('Undo failed: No fetcher configured');
+      await expect(page.locator('#status-bar')).toContainText('Undo failed:');
+      await expect(page.locator('#status-bar')).toContainText('No fetcher configured');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
       await page.keyboard.press('u');

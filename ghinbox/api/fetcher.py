@@ -34,6 +34,7 @@ class ActionResult:
 
     status: str = "ok"
     error: str | None = None
+    response_html: str | None = None
 
 
 class NotificationsFetcher:
@@ -188,6 +189,7 @@ class NotificationsFetcher:
 
         # Map action names to GitHub endpoints
         action_paths = {
+            "archive": "/notifications/beta/archive",
             "unarchive": "/notifications/beta/unarchive",
             "subscribe": "/notifications/beta/subscribe",
         }
@@ -206,59 +208,53 @@ class NotificationsFetcher:
         action_path = action_paths[action]
         url = f"https://github.com{action_path}"
         escaped_token = html.escape(authenticity_token, quote=True)
-        id_inputs = "\n".join(
-            f'<input type="hidden" name="notification_ids[]" value="{html.escape(notification_id, quote=True)}">'
-            for notification_id in notification_ids
-        )
 
-        page = None
         try:
-            page = self._context.new_page()
+            payload = urllib.parse.urlencode(
+                [
+                    ("authenticity_token", escaped_token),
+                    *[
+                        ("notification_ids[]", notification_id)
+                        for notification_id in notification_ids
+                    ],
+                ]
+            )
+            response = self._context.request.post(
+                url,
+                data=payload,
+                headers={
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Referer": "https://github.com/notifications",
+                },
+            )
+            content = response.text()
 
-            # We need to submit a POST request with form data.
-            # Playwright can do this by constructing a form and submitting it.
-            # Create an HTML page with a form and submit it programmatically.
-            form_html = f"""
-            <!DOCTYPE html>
-            <html>
-            <body>
-                <form id="action-form" method="POST" action="{url}">
-                    <input type="hidden" name="authenticity_token" value="{escaped_token}">
-                    {id_inputs}
-                </form>
-                <script>document.getElementById('action-form').submit();</script>
-            </body>
-            </html>
-            """
+            if response.status >= 400:
+                return ActionResult(
+                    status="error",
+                    error=f"HTTP {response.status}",
+                    response_html=content,
+                )
 
-            # Navigate to about:blank first, then set content
-            page.goto("about:blank")
-            page.set_content(form_html)
-
-            # Wait for navigation to complete (form submission)
-            # The form will redirect somewhere after submission
-            page.wait_for_load_state("networkidle", timeout=10000)
-
-            # Check if we got an error page
-            content = page.content()
-            if "error" in content.lower() and "422" in content:
-                page.close()
+            lower_content = content.lower()
+            if "error" in lower_content and "422" in lower_content:
                 return ActionResult(
                     status="error",
                     error="GitHub returned 422 - token may be invalid or expired",
+                    response_html=content,
+                )
+            if "your browser did something unexpected" in lower_content:
+                return ActionResult(
+                    status="error",
+                    error="GitHub returned an unexpected error page",
+                    response_html=content,
                 )
 
-            page.close()
-            return ActionResult(status="ok")
+            return ActionResult(status="ok", response_html=content)
 
         except Exception as e:
             error_text = f"{type(e).__name__}: {e}"
             print(f"[fetcher] Failed to submit action: {error_text}")
-            if page is not None:
-                try:
-                    page.close()
-                except Exception:
-                    pass
             return ActionResult(status="error", error=error_text)
 
     def __enter__(self) -> "NotificationsFetcher":
