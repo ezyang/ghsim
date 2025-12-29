@@ -347,7 +347,9 @@
                 'others-prs': 'PR'
             };
             const viewLabel = viewLabels[state.view];
-            const subfilter = state.viewFilters[state.view];
+            const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+            const stateFilter = viewFilters.state || 'all';
+            const authorFilter = viewFilters.author || 'all';
 
             // Check if view has no notifications at all
             const viewCounts = getViewCounts();
@@ -377,35 +379,35 @@
             }
 
             // Have notifications but subfilter shows none
-            if (subfilter === 'open') {
+            if (stateFilter === 'open') {
                 return {
                     title: `No open ${viewLabel} notifications`,
                     message: `All ${viewLabel} notifications in this view are closed or merged.`,
                 };
             }
 
-            if (subfilter === 'closed') {
+            if (stateFilter === 'closed') {
                 return {
                     title: `No closed ${viewLabel} notifications`,
                     message: `All ${viewLabel} notifications in this view are still open.`,
                 };
             }
 
-            if (subfilter === 'draft') {
+            if (stateFilter === 'draft') {
                 return {
                     title: `No draft ${viewLabel} notifications`,
                     message: `All ${viewLabel} notifications in this view are ready for review.`,
                 };
             }
 
-            if (subfilter === 'needs-review') {
+            if (stateFilter === 'needs-review') {
                 return {
                     title: 'No PRs need review',
                     message: 'No PRs need your review right now.',
                 };
             }
 
-            if (subfilter === 'approved') {
+            if (stateFilter === 'approved') {
                 if (!state.commentPrefetchEnabled) {
                     return {
                         title: 'Comment fetching disabled',
@@ -418,14 +420,14 @@
                 };
             }
 
-            if (subfilter === 'committer') {
+            if (authorFilter === 'committer') {
                 return {
                     title: 'No committer PRs',
                     message: 'No pull requests from repository committers match this view.',
                 };
             }
 
-            if (subfilter === 'external') {
+            if (authorFilter === 'external') {
                 return {
                     title: 'No external PRs',
                     message: 'No pull requests from external contributors match this view.',
@@ -629,11 +631,9 @@
                 // Save to localStorage
                 persistNotifications();
 
-                const currentSubfilter = state.viewFilters[state.view];
-                if (
-                    currentSubfilter === 'committer' ||
-                    currentSubfilter === 'external'
-                ) {
+                const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+                const authorFilter = viewFilters.author || 'all';
+                if (authorFilter === 'committer' || authorFilter === 'external') {
                     if (typeof maybePrefetchReviewMetadata === 'function') {
                         maybePrefetchReviewMetadata();
                     }
@@ -816,10 +816,15 @@
 
             // Update subfilter tab counts and active state
             const subfilterCounts = getSubfilterCounts();
-            const currentSubfilter = state.viewFilters[state.view];
+            const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+            const currentStateFilter = viewFilters.state || 'all';
+            const currentAuthorFilter = viewFilters.author || 'all';
             elements.subfilterTabs.forEach(tab => {
                 const subfilter = tab.dataset.subfilter;
                 const tabView = tab.closest('.subfilter-tabs')?.dataset.forView;
+                const group = tab.closest('.subfilter-tabs')?.dataset.subfilterGroup || 'state';
+                const currentSubfilter =
+                    group === 'author' ? currentAuthorFilter : currentStateFilter;
                 const isActive = tabView === state.view && subfilter === currentSubfilter;
                 tab.classList.toggle('active', isActive);
                 tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
@@ -828,14 +833,9 @@
                 if (tabView === state.view) {
                     const countSpan = tab.querySelector('.count');
                     if (countSpan) {
-                        if (subfilter === 'all') countSpan.textContent = subfilterCounts.all;
-                        else if (subfilter === 'open') countSpan.textContent = subfilterCounts.open;
-                        else if (subfilter === 'closed') countSpan.textContent = subfilterCounts.closed;
-                        else if (subfilter === 'draft') countSpan.textContent = subfilterCounts.draft;
-                        else if (subfilter === 'needs-review') countSpan.textContent = subfilterCounts.needsReview;
-                        else if (subfilter === 'approved') countSpan.textContent = subfilterCounts.approved;
-                        else if (subfilter === 'committer') countSpan.textContent = subfilterCounts.committer;
-                        else if (subfilter === 'external') countSpan.textContent = subfilterCounts.external;
+                        const countMap =
+                            group === 'author' ? subfilterCounts.author : subfilterCounts.state;
+                        countSpan.textContent = countMap[subfilter] ?? 0;
                     }
                 }
             });
@@ -921,10 +921,11 @@
                     const stateBadge = getStateBadge(notif);
                     const relativeTime = formatRelativeTime(notif.updated_at);
                     const reason = formatReason(notif.reason);
-                    const currentSubfilter = state.viewFilters[state.view];
+                    const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+                    const stateFilter = viewFilters.state || 'all';
                     const commentStatus =
                         state.commentPrefetchEnabled ||
-                        ['needs-review', 'approved'].includes(currentSubfilter)
+                        ['needs-review', 'approved'].includes(stateFilter)
                             ? getCommentStatus(notif)
                             : null;
                     const commentBadge = commentStatus

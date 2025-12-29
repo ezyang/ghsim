@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
+import { clearAppStorage } from './storage-utils';
 
 /**
  * Phase 8: Polish Tests
@@ -29,7 +30,7 @@ test.describe('Polish', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
   });
 
   test.describe('Keyboard Shortcuts', () => {

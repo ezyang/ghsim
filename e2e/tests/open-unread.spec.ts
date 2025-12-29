@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
+import { clearAppStorage } from './storage-utils';
 
 test.describe('Open all button', () => {
   test.beforeEach(async ({ page }) => {
@@ -29,7 +30,7 @@ test.describe('Open all button', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
 
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();

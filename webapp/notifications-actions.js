@@ -90,8 +90,9 @@
                     show: true,
                 };
             }
-            const currentSubfilter = state.viewFilters[state.view];
-            const isClosed = currentSubfilter === 'closed';
+            const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+            const stateFilter = viewFilters.state || 'all';
+            const isClosed = stateFilter === 'closed';
             if (isClosed && filteredNotifications.length > 0) {
                 return {
                     ids: filteredNotifications.map((notif) => notif.id),
@@ -111,8 +112,9 @@
             if (state.selected.size > 0) {
                 return { ids: [], show: false };
             }
-            const currentSubfilter = state.viewFilters[state.view];
-            if (currentSubfilter === 'approved' && filteredNotifications.length > 0) {
+            const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+            const stateFilter = viewFilters.state || 'all';
+            if (stateFilter === 'approved' && filteredNotifications.length > 0) {
                 return {
                     ids: filteredNotifications.map((notif) => notif.id),
                     show: true,

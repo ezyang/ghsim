@@ -225,7 +225,7 @@
             </nav>
 
             <!-- Subfilter Tabs for Issues -->
-            <nav class="subfilter-tabs" role="tablist" aria-label="Filter issues" data-for-view="issues">
+            <nav class="subfilter-tabs" role="tablist" aria-label="Filter issues" data-for-view="issues" data-subfilter-group="state">
                 <button
                     class="subfilter-tab active"
                     role="tab"
@@ -253,7 +253,7 @@
             </nav>
 
             <!-- Subfilter Tabs for My PRs (minimal for now) -->
-            <nav class="subfilter-tabs hidden" role="tablist" aria-label="Filter my PRs" data-for-view="my-prs">
+            <nav class="subfilter-tabs hidden" role="tablist" aria-label="Filter my PRs" data-for-view="my-prs" data-subfilter-group="state">
                 <button
                     class="subfilter-tab active"
                     role="tab"
@@ -265,7 +265,7 @@
             </nav>
 
             <!-- Subfilter Tabs for Others' PRs -->
-            <nav class="subfilter-tabs hidden" role="tablist" aria-label="Filter others' PRs" data-for-view="others-prs">
+            <nav class="subfilter-tabs hidden" role="tablist" aria-label="Filter others' PRs by status" data-for-view="others-prs" data-subfilter-group="state">
                 <button
                     class="subfilter-tab active"
                     role="tab"
@@ -281,22 +281,6 @@
                     data-subfilter="needs-review"
                 >
                     Needs review <span class="count">0</span>
-                </button>
-                <button
-                    class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
-                    data-subfilter="committer"
-                >
-                    Committers <span class="count">0</span>
-                </button>
-                <button
-                    class="subfilter-tab"
-                    role="tab"
-                    aria-selected="false"
-                    data-subfilter="external"
-                >
-                    External <span class="count">0</span>
                 </button>
                 <button
                     class="subfilter-tab"
@@ -321,6 +305,32 @@
                     data-subfilter="closed"
                 >
                     Closed <span class="count">0</span>
+                </button>
+            </nav>
+            <nav class="subfilter-tabs hidden" role="tablist" aria-label="Filter others' PRs by author" data-for-view="others-prs" data-subfilter-group="author">
+                <button
+                    class="subfilter-tab active"
+                    role="tab"
+                    aria-selected="true"
+                    data-subfilter="all"
+                >
+                    All <span class="count">0</span>
+                </button>
+                <button
+                    class="subfilter-tab"
+                    role="tab"
+                    aria-selected="false"
+                    data-subfilter="committer"
+                >
+                    Committers <span class="count">0</span>
+                </button>
+                <button
+                    class="subfilter-tab"
+                    role="tab"
+                    aria-selected="false"
+                    data-subfilter="external"
+                >
+                    External <span class="count">0</span>
                 </button>
             </nav>
 
@@ -465,6 +475,7 @@
                 localStorage.setItem('ghnotif_cache_bust', cacheBust);
             }
             const bust = cacheBust ? `?v=${encodeURIComponent(cacheBust)}` : '';
+            document.write(`<script src="notifications-idb.js${bust}"><\/script>`);
             document.write(`<script src="notifications-comments.js${bust}"><\/script>`);
             document.write(`<script src="notifications-core.js${bust}"><\/script>`);
             document.write(`<script src="notifications-sync.js${bust}"><\/script>`);

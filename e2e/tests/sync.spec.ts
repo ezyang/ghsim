@@ -1,11 +1,16 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import {
+  clearAppStorage,
+  readNotificationsCache,
+  seedNotificationsCache,
+} from './storage-utils';
 
 /**
- * Phase 3: Sync & Local Storage Tests
+ * Phase 3: Sync & IndexedDB Tests
  *
- * Tests for fetching notifications from API, pagination, and localStorage persistence.
+ * Tests for fetching notifications from API, pagination, and IndexedDB persistence.
  */
 
 // Load fixture data
@@ -24,9 +29,9 @@ test.describe('Sync Functionality', () => {
       });
     });
 
-    // Navigate first, then clear localStorage (so it doesn't clear on reload)
+    // Navigate first, then clear cached storage (so it doesn't clear on reload)
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
     // Ensure we're on the default "All" subfilter for Issues view
     const issuesSubfilters = page.locator('.subfilter-tabs[data-for-view="issues"]');
     await issuesSubfilters.locator('[data-subfilter="all"]').click();
@@ -85,7 +90,7 @@ test.describe('Sync Functionality', () => {
     await expect(page.locator('#notification-count')).toContainText('3 notifications');
   });
 
-  test('sync stores notifications in localStorage', async ({ page }) => {
+  test('sync stores notifications in IndexedDB', async ({ page }) => {
     await page.route('**/notifications/html/repo/test/repo', (route) => {
       route.fulfill({
         status: 200,
@@ -100,15 +105,13 @@ test.describe('Sync Functionality', () => {
     // Wait for sync to complete
     await expect(page.locator('#status-bar')).toContainText('Synced');
 
-    // Verify localStorage
-    const stored = await page.evaluate(() => {
-      const data = localStorage.getItem('ghnotif_notifications');
-      return data ? JSON.parse(data) : null;
-    });
+    const stored = await readNotificationsCache(page);
 
-    expect(stored).not.toBeNull();
-    expect(stored.length).toBe(5);
-    expect(stored[0].subject.title).toBeTruthy();
+    expect(Array.isArray(stored)).toBe(true);
+    if (Array.isArray(stored)) {
+      expect(stored.length).toBe(5);
+      expect(stored[0].subject.title).toBeTruthy();
+    }
   });
 
   test('quick sync stops after hitting an unchanged notification', async ({ page }) => {
@@ -163,11 +166,11 @@ test.describe('Sync Functionality', () => {
       },
     ];
 
-    await page.evaluate((payload) => {
-      localStorage.setItem('ghnotif_notifications', JSON.stringify(payload));
+    await page.evaluate(() => {
       localStorage.setItem('ghnotif_repo', 'test/repo');
       localStorage.setItem('ghnotif_last_synced_repo', 'test/repo');
-    }, previousNotifications);
+    });
+    await seedNotificationsCache(page, previousNotifications);
     await page.reload();
 
     const page1Response = {
@@ -269,12 +272,8 @@ test.describe('Sync Functionality', () => {
     await expect(page.locator('#status-bar')).toContainText('Synced 4 notifications');
     expect(requestCount).toBe(1);
 
-    const stored = await page.evaluate(() => {
-      const data = localStorage.getItem('ghnotif_notifications');
-      return data ? JSON.parse(data) : null;
-    });
-
-    expect(stored.map((notif: { id: string }) => notif.id)).toEqual([
+    const stored = await readNotificationsCache(page);
+    expect((stored as { id: string }[]).map((notif) => notif.id)).toEqual([
       'new-1',
       'api-1',
       'prev-2',
@@ -318,11 +317,11 @@ test.describe('Sync Functionality', () => {
       },
     ];
 
-    await page.evaluate((payload) => {
-      localStorage.setItem('ghnotif_notifications', JSON.stringify(payload));
+    await page.evaluate(() => {
       localStorage.setItem('ghnotif_repo', 'test/repo');
       localStorage.setItem('ghnotif_last_synced_repo', 'test/repo');
-    }, previousNotifications);
+    });
+    await seedNotificationsCache(page, previousNotifications);
     await page.reload();
 
     const page1Response = {
@@ -424,12 +423,8 @@ test.describe('Sync Functionality', () => {
     await expect(page.locator('#status-bar')).toContainText('Synced 3 notifications');
     expect(requestCount).toBe(1);
 
-    const stored = await page.evaluate(() => {
-      const data = localStorage.getItem('ghnotif_notifications');
-      return data ? JSON.parse(data) : null;
-    });
-
-    expect(stored.map((notif: { id: string }) => notif.id)).toEqual([
+    const stored = await readNotificationsCache(page);
+    expect((stored as { id: string }[]).map((notif) => notif.id)).toEqual([
       'new-1',
       'api-1',
       'prev-2',
@@ -472,11 +467,11 @@ test.describe('Sync Functionality', () => {
       },
     ];
 
-    await page.evaluate((payload) => {
-      localStorage.setItem('ghnotif_notifications', JSON.stringify(payload));
+    await page.evaluate(() => {
       localStorage.setItem('ghnotif_repo', 'test/repo');
       localStorage.setItem('ghnotif_last_synced_repo', 'test/repo');
-    }, previousNotifications);
+    });
+    await seedNotificationsCache(page, previousNotifications);
     await page.reload();
 
     const page1Response = {
@@ -594,12 +589,8 @@ test.describe('Sync Functionality', () => {
     await expect(page.locator('#status-bar')).toContainText('Synced 4 notifications');
     expect(requestCount).toBe(2);
 
-    const stored = await page.evaluate(() => {
-      const data = localStorage.getItem('ghnotif_notifications');
-      return data ? JSON.parse(data) : null;
-    });
-
-    expect(stored.map((notif: { id: string }) => notif.id)).toEqual([
+    const stored = await readNotificationsCache(page);
+    expect((stored as { id: string }[]).map((notif) => notif.id)).toEqual([
       'new-1',
       'api-1',
       'api-2',
@@ -623,17 +614,15 @@ test.describe('Sync Functionality', () => {
 
     await expect(page.locator('#status-bar')).toContainText('Synced');
 
-    // Verify notifications are in localStorage before reload
-    const storedBefore = await page.evaluate(() =>
-      localStorage.getItem('ghnotif_notifications')
-    );
-    expect(storedBefore).toBeTruthy();
+    // Verify notifications are in IndexedDB before reload
+    const storedBefore = await readNotificationsCache(page);
+    expect(Array.isArray(storedBefore)).toBe(true);
 
     // Reload the page (route mocks persist in Playwright)
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
 
-    // Notifications should still be displayed (loaded from localStorage)
+    // Notifications should still be displayed (loaded from IndexedDB)
     await expect(page.locator('#notification-count')).toContainText('3 notifications');
 
     // Empty state should be hidden
@@ -748,7 +737,7 @@ test.describe('Pagination', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
   });
 
   test('sync traverses multiple pages', async ({ page }) => {
@@ -855,12 +844,8 @@ test.describe('Pagination', () => {
     expect(requestCount).toBe(2);
 
     // All notifications should be stored
-    const stored = await page.evaluate(() => {
-      const data = localStorage.getItem('ghnotif_notifications');
-      return data ? JSON.parse(data) : null;
-    });
-
-    expect(stored.length).toBe(3);
+    const stored = await readNotificationsCache(page);
+    expect((stored as unknown[]).length).toBe(3);
   });
 
   test('notifications are sorted by updated_at descending', async ({ page }) => {
@@ -910,15 +895,13 @@ test.describe('Pagination', () => {
 
     await expect(page.locator('#status-bar')).toContainText('Synced');
 
-    // Verify order in localStorage
-    const stored = await page.evaluate(() => {
-      const data = localStorage.getItem('ghnotif_notifications');
-      return data ? JSON.parse(data) : null;
-    });
+    // Verify order in IndexedDB
+    const stored = await readNotificationsCache(page);
 
-    expect(stored[0].id).toBe('new');
-    expect(stored[1].id).toBe('middle');
-    expect(stored[2].id).toBe('old');
+    const storedList = stored as { id: string }[];
+    expect(storedList[0].id).toBe('new');
+    expect(storedList[1].id).toBe('middle');
+    expect(storedList[2].id).toBe('old');
   });
 });
 
@@ -933,7 +916,7 @@ test.describe('Error Handling', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
   });
 
   test('shows error on API failure', async ({ page }) => {
@@ -1046,7 +1029,7 @@ test.describe('Notifications Display', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
   });
 
   test('displays notification titles in list', async ({ page }) => {

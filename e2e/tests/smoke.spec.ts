@@ -8,9 +8,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Smoke Tests', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage before each test for isolation
+    // Clear cached storage before each test for isolation
     await page.addInitScript(() => {
       localStorage.clear();
+      indexedDB.deleteDatabase('ghnotif_cache');
     });
   });
 

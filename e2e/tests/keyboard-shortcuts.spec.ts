@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clearAppStorage, seedCommentCache } from './storage-utils';
 import mixedFixture from '../fixtures/notifications_mixed.json';
 
 test.describe('Keyboard Shortcuts', () => {
@@ -53,19 +54,13 @@ test.describe('Keyboard Shortcuts', () => {
       },
     };
 
-    await page.addInitScript(
-      ({ cacheKey, prefetchKey, cacheValue }) => {
-        localStorage.setItem(cacheKey, JSON.stringify(cacheValue));
-        localStorage.setItem(prefetchKey, 'true');
-      },
-      {
-        cacheKey: 'ghnotif_bulk_comment_cache_v1',
-        prefetchKey: 'ghnotif_comment_prefetch_enabled',
-        cacheValue: commentCache,
-      }
-    );
-
     await page.goto('notifications.html');
+    await clearAppStorage(page);
+    await page.evaluate(() => {
+      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
+    });
+    await seedCommentCache(page, commentCache);
+    await page.reload();
 
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
@@ -112,7 +107,9 @@ test.describe('Keyboard Shortcuts', () => {
 
     // Switch to Others' PRs view and approved subfilter to see notif-2
     await page.locator('#view-others-prs').click();
-    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    const othersPrsSubfilters = page.locator(
+      '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]'
+    );
     await othersPrsSubfilters.locator('[data-subfilter="approved"]').click();
     await expect(page.locator('.notification-item')).toHaveCount(1);
 

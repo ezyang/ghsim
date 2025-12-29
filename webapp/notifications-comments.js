@@ -13,13 +13,24 @@ const COMMENT_PREFETCH_KEY = 'ghnotif_comment_prefetch_enabled';
 const COMMENT_EXPAND_KEY = 'ghnotif_comment_expand_enabled';
 const COMMENT_HIDE_UNINTERESTING_KEY = 'ghnotif_comment_hide_uninteresting';
 
-function loadCommentCache() {
+async function loadCommentCache() {
+    try {
+        const cached = await loadCommentCacheStorage();
+        if (cached && typeof cached === 'object') {
+            return cached;
+        }
+    } catch (e) {
+        console.error('Failed to load comment cache from IndexedDB:', e);
+    }
     const raw = localStorage.getItem(COMMENT_CACHE_KEY);
     if (!raw) {
         return { version: 1, threads: {} };
     }
     try {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        await saveCommentCacheStorage(parsed);
+        localStorage.removeItem(COMMENT_CACHE_KEY);
+        return parsed;
     } catch (e) {
         console.error('Failed to parse comment cache:', e);
         return { version: 1, threads: {} };
@@ -27,7 +38,9 @@ function loadCommentCache() {
 }
 
 function saveCommentCache() {
-    localStorage.setItem(COMMENT_CACHE_KEY, JSON.stringify(state.commentCache));
+    saveCommentCacheStorage(state.commentCache).catch((error) => {
+        console.error('Failed to persist comment cache:', error);
+    });
 }
 
 function isCommentCacheFresh(cached) {

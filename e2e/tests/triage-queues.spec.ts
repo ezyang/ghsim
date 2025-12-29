@@ -1,4 +1,9 @@
 import { test, expect } from '@playwright/test';
+import {
+  clearAppStorage,
+  readNotificationsCache,
+  seedCommentCache,
+} from './storage-utils';
 
 const notificationsResponse = {
   source_url: 'https://github.com/notifications?query=repo:test/repo',
@@ -116,19 +121,20 @@ test.describe('Triage queues', () => {
       },
     };
 
-    await page.addInitScript((cache) => {
-      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
-      localStorage.setItem('ghnotif_bulk_comment_cache_v1', JSON.stringify(cache));
-    }, commentCache);
-
     await page.goto('notifications.html');
+    await clearAppStorage(page);
+    await page.evaluate(() => {
+      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
+    });
+    await seedCommentCache(page, commentCache);
+    await page.reload();
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
     await expect
-      .poll(async () => page.evaluate(() => {
-        const raw = localStorage.getItem('ghnotif_notifications');
-        return raw ? JSON.parse(raw).length : 0;
-      }))
+      .poll(async () => {
+        const cached = await readNotificationsCache(page);
+        return Array.isArray(cached) ? cached.length : 0;
+      })
       .toBe(2);
   });
 
@@ -136,7 +142,7 @@ test.describe('Triage queues', () => {
     // Switch to Others' PRs view
     await page.locator('#view-others-prs').click();
 
-    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]');
     await expect(othersPrsSubfilters.locator('[data-subfilter="needs-review"] .count')).toHaveText('1');
     await expect(othersPrsSubfilters.locator('[data-subfilter="approved"] .count')).toHaveText('1');
 
@@ -164,7 +170,7 @@ test.describe('Triage queues', () => {
 
     // Switch to Others' PRs view and approved subfilter
     await page.locator('#view-others-prs').click();
-    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]');
     await othersPrsSubfilters.locator('[data-subfilter="approved"]').click();
     await expect(page.locator('[data-id="thread-pr-2"]')).toBeVisible();
 
@@ -199,7 +205,7 @@ test.describe('Triage queues', () => {
     await page.locator('#comment-expand-toggle').check();
     // Switch to Others' PRs view and approved subfilter
     await page.locator('#view-others-prs').click();
-    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]');
     await othersPrsSubfilters.locator('[data-subfilter="approved"]').click();
     await expect(page.locator('[data-id="thread-pr-2"]')).toBeVisible();
 
@@ -223,7 +229,7 @@ test.describe('Triage queues', () => {
   }) => {
     // Switch to Others' PRs view and approved subfilter
     await page.locator('#view-others-prs').click();
-    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]');
     await othersPrsSubfilters.locator('[data-subfilter="approved"]').click();
     await expect(page.locator('[data-id="thread-pr-2"]')).toBeVisible();
 
@@ -258,7 +264,7 @@ test.describe('Triage queues', () => {
 
     // Switch to Others' PRs view and approved subfilter
     await page.locator('#view-others-prs').click();
-    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]');
     await othersPrsSubfilters.locator('[data-subfilter="approved"]').click();
     await expect(page.locator('[data-id="thread-pr-2"]')).toBeVisible();
 
@@ -278,7 +284,7 @@ test.describe('Triage queues', () => {
 
     // Switch to Others' PRs view
     await page.locator('#view-others-prs').click();
-    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]');
 
     // Not visible in Needs Review subfilter (default for Others' PRs)
     await expect(unsubscribeAllBtn).not.toBeVisible();
@@ -355,25 +361,26 @@ test.describe('Triage queues GraphQL review decisions', () => {
       route.fulfill({ status: 400, contentType: 'application/json', body: '{}' });
     });
 
-    await page.addInitScript(() => {
+    await page.goto('notifications.html');
+    await clearAppStorage(page);
+    await page.evaluate(() => {
       localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
     });
-
-    await page.goto('notifications.html');
+    await page.reload();
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
     await expect
-      .poll(async () => page.evaluate(() => {
-        const raw = localStorage.getItem('ghnotif_notifications');
-        return raw ? JSON.parse(raw).length : 0;
-      }))
+      .poll(async () => {
+        const cached = await readNotificationsCache(page);
+        return Array.isArray(cached) ? cached.length : 0;
+      })
       .toBe(2);
   });
 
   test('approved queue uses GraphQL review decisions', async ({ page }) => {
     await page.locator('#view-others-prs').click();
 
-    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+    const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]');
     await expect(othersPrsSubfilters.locator('[data-subfilter="approved"] .count')).toHaveText('1');
     await othersPrsSubfilters.locator('[data-subfilter="approved"]').click();
 

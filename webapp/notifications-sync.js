@@ -468,11 +468,9 @@
                 // Save to localStorage
                 persistNotifications();
 
-                const currentSubfilter = state.viewFilters[state.view];
-                if (
-                    currentSubfilter === 'committer' ||
-                    currentSubfilter === 'external'
-                ) {
+                const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+                const authorFilter = viewFilters.author || 'all';
+                if (authorFilter === 'committer' || authorFilter === 'external') {
                     if (typeof maybePrefetchReviewMetadata === 'function') {
                         maybePrefetchReviewMetadata();
                     }

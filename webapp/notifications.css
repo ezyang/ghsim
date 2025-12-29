@@ -827,6 +827,10 @@
             background-color: var(--color-bg-subtle);
         }
 
+        .subfilter-tabs + .subfilter-tabs {
+            border-top: 1px solid var(--color-border-default);
+        }
+
         .subfilter-tabs.hidden {
             display: none;
         }

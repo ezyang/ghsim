@@ -1,6 +1,20 @@
 # ghinbox
 
-A better UI for GitHub notifications: bulk triage, comment-aware filtering, and fast syncs, built around `webapp/notifications.html` and backed by a REST API server that exposes data GitHub's official API doesn't provide.
+A better UI for GitHub notifications.  Forged from the fires of PyTorch.
+
+The three main design philosophies of ghinbox are as follows:
+
+1. **Pull more data, but less often.**  GitHub notifications allows only a very impoverished set of search queries and forces a strict limit of 25 items per page; in return, you can freely refresh your notifications without being rate limited.  ghinbox makes the opposite tradeoff: we want all of the notifications and all of the data; to avoid being rate-limited, you must explicitly request a sync and we expect you to only do syncs rarely, opting to show you our offline view of the state of notifications.
+
+2. **Issue and pull request notifications are fundamentally different.**  GitHub notifications jumble issues and pull requests together.  We argue the workflow for handling issues and pull requests is quite different: issues you can just read, perhaps dash off a quick response; a pull request, you have to actually sit down and fully understand what is changed.  Issues you can doomscroll on your phone; pull requests require focused attention.  You should have separate flows for handling each of them.
+
+3. **Core contributor PRs privileged over external contributor PRs.**  GitHub notifications doesn't distinguish between PRs that come from core contributors versus external contributors; anyone can CC you and dump a PR in your inbox.  This design makes it easy for the masses to hijack maintainer attention.  Instead, external contributions should be relegated to their own section, where a maintainer can engage with them on their own terms, subject to whatever attention they want to allocate.
+
+
+
+GitHub's official notifications UI is hobbled by the need to scale with the huge number of users in GitHub.  This means GitHub is unwilling to do things like prefetch comments or do complicated filtering, since this would add a lot of load to their servers, even when it would be really good for power users.  ghinbox's value proposition is that it will do all of fanout fetches for your and display it in a consolidated UI, but only do the fetch when you explicitly ask for it (so you are not repeatedly hammering GitHub's servers in the course of normally processing issues.)
+
+
 
 ## Why This Exists
 

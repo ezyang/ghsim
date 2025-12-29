@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clearAppStorage, readCommentCache, seedCommentCache } from './storage-utils';
 
 test.describe('Comment cache', () => {
   test.beforeEach(async ({ page }) => {
@@ -31,23 +32,21 @@ test.describe('Comment cache', () => {
   });
 
   test('clear cache button removes stored comments', async ({ page }) => {
-    await page.addInitScript(() => {
-      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
-      localStorage.setItem(
-        'ghnotif_bulk_comment_cache_v1',
-        JSON.stringify({
-          version: 1,
-          threads: {
-            '123': {
-              fetchedAt: new Date().toISOString(),
-              comments: [],
-            },
-          },
-        })
-      );
-    });
-
     await page.goto('notifications.html');
+    await clearAppStorage(page);
+    await page.evaluate(() => {
+      localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
+    });
+    await seedCommentCache(page, {
+      version: 1,
+      threads: {
+        '123': {
+          fetchedAt: new Date().toISOString(),
+          comments: [],
+        },
+      },
+    });
+    await page.reload();
 
     const status = page.locator('#comment-cache-status');
     const clearBtn = page.locator('#clear-comment-cache-btn');
@@ -60,9 +59,7 @@ test.describe('Comment cache', () => {
     await expect(status).toContainText('Comments cached: 0');
     await expect(clearBtn).toBeDisabled();
 
-    const cachedValue = await page.evaluate(() =>
-      localStorage.getItem('ghnotif_bulk_comment_cache_v1')
-    );
+    const cachedValue = await readCommentCache(page);
     expect(cachedValue).toBeNull();
   });
 });

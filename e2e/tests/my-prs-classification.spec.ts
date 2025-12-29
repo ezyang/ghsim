@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clearAppStorage } from './storage-utils';
 
 const fixture = {
   source_url: 'https://github.com/notifications?query=repo:test/repo',
@@ -109,7 +110,7 @@ test.describe('My PR classification', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
   });
 
   test('uses author reason instead of actor for My PRs', async ({ page }) => {

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
+import { clearAppStorage, seedNotificationsCache } from './storage-utils';
 
 /**
  * Filtering Tests
@@ -29,7 +30,7 @@ test.describe('Filtering', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
   });
 
   test.describe('View Tabs', () => {
@@ -85,7 +86,9 @@ test.describe('Filtering', () => {
 
     test('hides other subfilter tabs when Issues view is active', async ({ page }) => {
       const myPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="my-prs"]');
-      const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+      const othersPrsSubfilters = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]'
+      );
       await expect(myPrsSubfilters).toHaveClass(/hidden/);
       await expect(othersPrsSubfilters).toHaveClass(/hidden/);
     });
@@ -93,15 +96,22 @@ test.describe('Filtering', () => {
     test('shows Others PRs subfilters when switching to Others PRs view', async ({ page }) => {
       await page.locator('#view-others-prs').click();
 
-      const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
-      await expect(othersPrsSubfilters).not.toHaveClass(/hidden/);
-      await expect(othersPrsSubfilters.locator('[data-subfilter="all"]')).toBeVisible();
-      await expect(othersPrsSubfilters.locator('[data-subfilter="needs-review"]')).toBeVisible();
-      await expect(othersPrsSubfilters.locator('[data-subfilter="committer"]')).toBeVisible();
-      await expect(othersPrsSubfilters.locator('[data-subfilter="external"]')).toBeVisible();
-      await expect(othersPrsSubfilters.locator('[data-subfilter="approved"]')).toBeVisible();
-      await expect(othersPrsSubfilters.locator('[data-subfilter="draft"]')).toBeVisible();
-      await expect(othersPrsSubfilters.locator('[data-subfilter="closed"]')).toBeVisible();
+      const othersPrsStatus = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]'
+      );
+      const othersPrsAuthor = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="author"]'
+      );
+      await expect(othersPrsStatus).not.toHaveClass(/hidden/);
+      await expect(othersPrsAuthor).not.toHaveClass(/hidden/);
+      await expect(othersPrsStatus.locator('[data-subfilter="all"]')).toBeVisible();
+      await expect(othersPrsStatus.locator('[data-subfilter="needs-review"]')).toBeVisible();
+      await expect(othersPrsStatus.locator('[data-subfilter="approved"]')).toBeVisible();
+      await expect(othersPrsStatus.locator('[data-subfilter="draft"]')).toBeVisible();
+      await expect(othersPrsStatus.locator('[data-subfilter="closed"]')).toBeVisible();
+      await expect(othersPrsAuthor.locator('[data-subfilter="all"]')).toBeVisible();
+      await expect(othersPrsAuthor.locator('[data-subfilter="committer"]')).toBeVisible();
+      await expect(othersPrsAuthor.locator('[data-subfilter="external"]')).toBeVisible();
     });
 
     test('subfilter divider stays within the notifications container', async ({ page }) => {
@@ -230,16 +240,22 @@ test.describe('Filtering', () => {
     test('shows subfilter counts for Others PRs view', async ({ page }) => {
       await page.locator('#view-others-prs').click();
 
-      const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+      const othersPrsStatus = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]'
+      );
+      const othersPrsAuthor = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="author"]'
+      );
 
       // 2 PRs: 1 open, 1 merged (closed)
-      await expect(othersPrsSubfilters.locator('[data-subfilter="all"] .count')).toHaveText('2');
-      await expect(othersPrsSubfilters.locator('[data-subfilter="needs-review"] .count')).toHaveText('1');
-      await expect(othersPrsSubfilters.locator('[data-subfilter="committer"] .count')).toHaveText('0');
-      await expect(othersPrsSubfilters.locator('[data-subfilter="external"] .count')).toHaveText('0');
-      await expect(othersPrsSubfilters.locator('[data-subfilter="approved"] .count')).toHaveText('0');
-      await expect(othersPrsSubfilters.locator('[data-subfilter="draft"] .count')).toHaveText('0');
-      await expect(othersPrsSubfilters.locator('[data-subfilter="closed"] .count')).toHaveText('1');
+      await expect(othersPrsStatus.locator('[data-subfilter="all"] .count')).toHaveText('2');
+      await expect(othersPrsStatus.locator('[data-subfilter="needs-review"] .count')).toHaveText('1');
+      await expect(othersPrsStatus.locator('[data-subfilter="approved"] .count')).toHaveText('0');
+      await expect(othersPrsStatus.locator('[data-subfilter="draft"] .count')).toHaveText('0');
+      await expect(othersPrsStatus.locator('[data-subfilter="closed"] .count')).toHaveText('1');
+      await expect(othersPrsAuthor.locator('[data-subfilter="all"] .count')).toHaveText('2');
+      await expect(othersPrsAuthor.locator('[data-subfilter="committer"] .count')).toHaveText('0');
+      await expect(othersPrsAuthor.locator('[data-subfilter="external"] .count')).toHaveText('0');
     });
   });
 
@@ -286,14 +302,24 @@ test.describe('Filtering', () => {
       await expect(page.locator('#status-bar')).toContainText('Synced 5 notifications');
       await page.locator('#view-others-prs').click();
 
+      const othersPrsStatus = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]'
+      );
+      const othersPrsAuthor = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="author"]'
+      );
       const committerResponse = page.waitForResponse('**/github/graphql');
-      await page.locator('[data-subfilter="committer"]').click();
+      await othersPrsAuthor.locator('[data-subfilter="committer"]').click();
       await committerResponse;
       await expect(page.locator('.notification-item')).toHaveCount(1);
       await expect(page.locator('[data-id="notif-2"]')).toBeVisible();
       await expect(page.locator('[data-id="notif-4"]')).not.toBeAttached();
 
-      await page.locator('[data-subfilter="external"]').click();
+      await othersPrsStatus.locator('[data-subfilter="needs-review"]').click();
+      await expect(page.locator('.notification-item')).toHaveCount(1);
+      await expect(page.locator('[data-id="notif-2"]')).toBeVisible();
+
+      await othersPrsAuthor.locator('[data-subfilter="external"]').click();
       await expect(page.locator('.notification-item')).toHaveCount(1);
       await expect(page.locator('[data-id="notif-4"]')).toBeVisible();
       await expect(page.locator('[data-id="notif-2"]')).not.toBeAttached();
@@ -389,15 +415,20 @@ test.describe('Filtering', () => {
       const savedViewFilters = await page.evaluate(() =>
         localStorage.getItem('ghnotif_view_filters')
       );
-      expect(JSON.parse(savedViewFilters!)).toHaveProperty('issues', 'closed');
+      const parsed = JSON.parse(savedViewFilters!);
+      expect(parsed).toHaveProperty('issues');
+      expect(parsed.issues).toHaveProperty('state', 'closed');
     });
 
     test('restores subfilter and applies to loaded notifications', async ({ page }) => {
-      await page.evaluate((notifications) => {
+      await page.evaluate(() => {
         localStorage.setItem('ghnotif_view', 'issues');
-        localStorage.setItem('ghnotif_view_filters', JSON.stringify({ issues: 'closed' }));
-        localStorage.setItem('ghnotif_notifications', JSON.stringify(notifications));
-      }, mixedFixture.notifications);
+        localStorage.setItem(
+          'ghnotif_view_filters',
+          JSON.stringify({ issues: { state: 'closed' } })
+        );
+      });
+      await seedNotificationsCache(page, mixedFixture.notifications);
 
       await page.reload();
 
@@ -501,7 +532,9 @@ test.describe('Filtering', () => {
       // Should show 3 PRs (2 original + 1 draft) in the view count
       await expect(page.locator('#view-others-prs .count')).toHaveText('3');
 
-      const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+      const othersPrsSubfilters = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]'
+      );
 
       await expect(othersPrsSubfilters.locator('[data-subfilter="draft"] .count')).toHaveText('1');
       await expect(othersPrsSubfilters.locator('[data-subfilter="needs-review"] .count')).toHaveText('1');
@@ -528,7 +561,9 @@ test.describe('Filtering', () => {
       await page.locator('#view-others-prs').click();
 
       // Switch to Closed subfilter
-      const othersPrsSubfilters = page.locator('.subfilter-tabs[data-for-view="others-prs"]');
+      const othersPrsSubfilters = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="state"]'
+      );
       await othersPrsSubfilters.locator('[data-subfilter="closed"]').click();
 
       // Merged PR should be visible

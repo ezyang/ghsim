@@ -6,9 +6,12 @@
 
         // Default view filters for each view
         const DEFAULT_VIEW_FILTERS = {
-            'issues': 'all',           // 'all' | 'open' | 'closed'
-            'my-prs': 'all',           // 'all' (minimal for now)
-            'others-prs': 'all'        // 'all' | 'needs-review' | 'approved' | 'draft' | 'closed'
+            'issues': { state: 'all' }, // 'all' | 'open' | 'closed'
+            'my-prs': { state: 'all' }, // 'all'
+            'others-prs': {
+                state: 'all', // 'all' | 'needs-review' | 'approved' | 'draft' | 'closed'
+                author: 'all', // 'all' | 'committer' | 'external'
+            },
         };
 
         // Application state
@@ -18,7 +21,7 @@
             loading: false,
             error: null,
             view: 'issues', // 'issues', 'my-prs', 'others-prs'
-            viewFilters: { ...DEFAULT_VIEW_FILTERS },
+            viewFilters: JSON.parse(JSON.stringify(DEFAULT_VIEW_FILTERS)),
             selected: new Set(), // Set of selected notification IDs
             activeNotificationId: null, // Keyboard selection cursor
             lastClickedId: null, // For shift-click range selection
@@ -30,7 +33,7 @@
             commentHideUninteresting: false,
             commentQueue: [],
             commentQueueRunning: false,
-            commentCache: loadCommentCache(),
+            commentCache: { version: 1, threads: {} },
             rateLimit: null,
             rateLimitError: null,
             graphqlRateLimit: null,
@@ -79,11 +82,31 @@
             keyboardShortcutsClose: document.getElementById('keyboard-shortcuts-close'),
         };
 
+        function normalizeViewFilters(raw) {
+            const normalized = JSON.parse(JSON.stringify(DEFAULT_VIEW_FILTERS));
+            if (!raw || typeof raw !== 'object') {
+                return normalized;
+            }
+            ['issues', 'my-prs', 'others-prs'].forEach((view) => {
+                const value = raw[view];
+                if (typeof value === 'string') {
+                    normalized[view].state = value;
+                    return;
+                }
+                if (value && typeof value === 'object') {
+                    normalized[view] = {
+                        ...normalized[view],
+                        ...value,
+                    };
+                }
+            });
+            return normalized;
+        }
+
         function persistNotifications() {
-            localStorage.setItem(
-                'ghnotif_notifications',
-                JSON.stringify(state.notifications)
-            );
+            saveNotificationsCache(state.notifications).catch((error) => {
+                console.error('Failed to persist notifications cache:', error);
+            });
         }
 
         function persistAuthenticityToken(token) {
@@ -97,7 +120,34 @@
         // loadCommentCache, saveCommentCache, isCommentCacheFresh are in notifications-comments.js
 
         // Initialize app
-        function init() {
+        async function loadNotificationsFromCache() {
+            try {
+                const cached = await loadNotificationsCache();
+                if (Array.isArray(cached)) {
+                    return cached;
+                }
+            } catch (error) {
+                console.error('Failed to load notifications cache from IndexedDB:', error);
+            }
+            const legacy = localStorage.getItem('ghnotif_notifications');
+            if (!legacy) {
+                return [];
+            }
+            try {
+                const parsed = JSON.parse(legacy);
+                if (Array.isArray(parsed)) {
+                    await saveNotificationsCache(parsed);
+                    localStorage.removeItem('ghnotif_notifications');
+                    return parsed;
+                }
+            } catch (error) {
+                console.error('Failed to parse saved notifications:', error);
+            }
+            return [];
+        }
+
+        // Initialize app
+        async function init() {
             // Load saved repo from localStorage
             const savedRepo = localStorage.getItem('ghnotif_repo');
             if (savedRepo) {
@@ -105,14 +155,12 @@
                 state.repo = savedRepo;
             }
 
-            // Load saved notifications from localStorage
-            const savedNotifications = localStorage.getItem('ghnotif_notifications');
-            if (savedNotifications) {
-                try {
-                    state.notifications = JSON.parse(savedNotifications);
-                } catch (e) {
-                    console.error('Failed to parse saved notifications:', e);
-                }
+            // Load cached notifications and comments from IndexedDB
+            state.notifications = await loadNotificationsFromCache();
+            try {
+                state.commentCache = await loadCommentCache();
+            } catch (error) {
+                console.error('Failed to load comment cache:', error);
             }
             state.lastSyncedRepo = localStorage.getItem(LAST_SYNCED_REPO_KEY);
             const savedAuthToken = localStorage.getItem(AUTH_TOKEN_KEY);
@@ -131,8 +179,7 @@
             if (savedViewFilters) {
                 try {
                     const parsed = JSON.parse(savedViewFilters);
-                    // Merge with defaults to handle any missing keys
-                    state.viewFilters = { ...DEFAULT_VIEW_FILTERS, ...parsed };
+                    state.viewFilters = normalizeViewFilters(parsed);
                 } catch (e) {
                     console.error('Failed to parse saved view filters:', e);
                 }
@@ -182,7 +229,10 @@
             elements.subfilterTabs.forEach(tab => {
                 tab.addEventListener('click', () => {
                     const subfilter = tab.dataset.subfilter;
-                    setSubfilter(subfilter);
+                    const group = tab
+                        .closest('.subfilter-tabs')
+                        ?.dataset.subfilterGroup || 'state';
+                    setSubfilter(subfilter, group);
                 });
             });
 
@@ -280,25 +330,32 @@
             updateSubfilterVisibility();
 
             // Check if current subfilter requires comment prefetch
-            const subfilter = state.viewFilters[view];
-            if (subfilter === 'approved' && !state.commentPrefetchEnabled) {
+            const viewFilters = state.viewFilters[view] || DEFAULT_VIEW_FILTERS[view];
+            const stateFilter = viewFilters.state || 'all';
+            const authorFilter = viewFilters.author || 'all';
+            if (stateFilter === 'approved' && !state.commentPrefetchEnabled) {
                 showStatus('Enable comment fetching to evaluate triage filters.', 'info');
             }
-            if (subfilter === 'committer' || subfilter === 'external') {
+            if (authorFilter === 'committer' || authorFilter === 'external') {
                 maybePrefetchReviewMetadata();
             }
             render();
         }
 
         // Set the subfilter for the current view
-        function setSubfilter(subfilter) {
-            state.viewFilters[state.view] = subfilter;
+        function setSubfilter(subfilter, group = 'state') {
+            if (!state.viewFilters[state.view]) {
+                state.viewFilters[state.view] = {
+                    ...DEFAULT_VIEW_FILTERS[state.view],
+                };
+            }
+            state.viewFilters[state.view][group] = subfilter;
             localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(state.viewFilters));
 
-            if (subfilter === 'approved' && !state.commentPrefetchEnabled) {
+            if (group === 'state' && subfilter === 'approved' && !state.commentPrefetchEnabled) {
                 showStatus('Enable comment fetching to evaluate triage filters.', 'info');
             }
-            if (subfilter === 'committer' || subfilter === 'external') {
+            if (group === 'author' && (subfilter === 'committer' || subfilter === 'external')) {
                 maybePrefetchReviewMetadata();
             }
             render();
@@ -357,10 +414,19 @@
                 if (stateFilter === 'approved') {
                     return safeIsNotificationApproved(notif);
                 }
-                if (stateFilter === 'committer') {
+                return true;
+            });
+        }
+
+        function applyAuthorFilter(notifications, authorFilter) {
+            if (authorFilter === 'all') {
+                return notifications;
+            }
+            return notifications.filter(notif => {
+                if (authorFilter === 'committer') {
                     return safeIsNotificationFromCommitter(notif);
                 }
-                if (stateFilter === 'external') {
+                if (authorFilter === 'external') {
                     return safeIsNotificationFromExternal(notif);
                 }
                 return true;
@@ -413,8 +479,12 @@
             let filtered = state.notifications.filter(matchesView);
 
             // Step 2: Apply view-specific state filter
-            const stateFilter = state.viewFilters[state.view];
-            filtered = applyStateFilter(filtered, stateFilter);
+            const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+            filtered = applyStateFilter(filtered, viewFilters.state || 'all');
+
+            if (state.view === 'others-prs') {
+                filtered = applyAuthorFilter(filtered, viewFilters.author || 'all');
+            }
 
             return filtered;
         }
@@ -443,40 +513,65 @@
         // Count notifications by subfilter for the current view
         function getSubfilterCounts() {
             const viewNotifications = state.notifications.filter(matchesView);
-            let all = viewNotifications.length;
-            let open = 0;
-            let closed = 0;
-            let draft = 0;
-            let needsReview = 0;
-            let approved = 0;
-            let committer = 0;
-            let external = 0;
+            const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+            const stateFilter = viewFilters.state || 'all';
+            const authorFilter = viewFilters.author || 'all';
 
-            viewNotifications.forEach(notif => {
+            const stateCounts = {
+                all: 0,
+                open: 0,
+                closed: 0,
+                draft: 0,
+                needsReview: 0,
+                approved: 0,
+            };
+            const authorCounts = {
+                all: 0,
+                committer: 0,
+                external: 0,
+            };
+
+            const baseForStateCounts =
+                state.view === 'others-prs'
+                    ? applyAuthorFilter(viewNotifications, authorFilter)
+                    : viewNotifications;
+            const baseForAuthorCounts =
+                state.view === 'others-prs'
+                    ? applyStateFilter(viewNotifications, stateFilter)
+                    : [];
+
+            stateCounts.all = baseForStateCounts.length;
+            baseForStateCounts.forEach(notif => {
                 const notifState = notif.subject.state;
                 if (notifState === 'open' || notifState === 'draft') {
-                    open++;
+                    stateCounts.open++;
                 } else if (notifState === 'closed' || notifState === 'merged') {
-                    closed++;
+                    stateCounts.closed++;
                 }
                 if (notifState === 'draft') {
-                    draft++;
+                    stateCounts.draft++;
                 }
                 if (safeIsNotificationNeedsReview(notif)) {
-                    needsReview++;
+                    stateCounts.needsReview++;
                 }
                 if (safeIsNotificationApproved(notif)) {
-                    approved++;
-                }
-                if (safeIsNotificationFromCommitter(notif)) {
-                    committer++;
-                }
-                if (safeIsNotificationFromExternal(notif)) {
-                    external++;
+                    stateCounts.approved++;
                 }
             });
 
-            return { all, open, closed, draft, needsReview, approved, committer, external };
+            if (state.view === 'others-prs') {
+                authorCounts.all = baseForAuthorCounts.length;
+                baseForAuthorCounts.forEach(notif => {
+                    if (safeIsNotificationFromCommitter(notif)) {
+                        authorCounts.committer++;
+                    }
+                    if (safeIsNotificationFromExternal(notif)) {
+                        authorCounts.external++;
+                    }
+                });
+            }
+
+            return { state: stateCounts, author: authorCounts };
         }
 
         function updateCommentCacheStatus() {
@@ -492,6 +587,9 @@
         function handleClearCommentCache() {
             state.commentCache = { version: 1, threads: {} };
             state.commentQueue = [];
+            clearCommentCacheStorage().catch((error) => {
+                console.error('Failed to clear comment cache:', error);
+            });
             localStorage.removeItem(COMMENT_CACHE_KEY);
             if (state.commentPrefetchEnabled && state.notifications.length > 0) {
                 scheduleCommentPrefetch(state.notifications);

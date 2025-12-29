@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clearAppStorage } from './storage-utils';
 
 // Fixture with a first notification that has many comments to make it tall
 const fixtureWithManyComments = {
@@ -192,7 +193,7 @@ test.describe('Scroll After Done', () => {
     await page.setViewportSize({ width: 1200, height: 400 });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
 
     // Sync to load notifications
     await page.locator('#repo-input').fill('test/repo');

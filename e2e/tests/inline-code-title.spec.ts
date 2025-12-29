@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clearAppStorage } from './storage-utils';
 
 const inlineCodeFixture = {
   source_url: 'https://github.com/notifications?query=repo:test/repo',
@@ -54,7 +55,7 @@ test.describe('Inline Code Titles', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
 
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
+import { clearAppStorage } from './storage-utils';
 
 /**
  * Phase 6: Selection Tests
@@ -29,7 +30,7 @@ test.describe('Selection', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
 
     // Sync to load notifications
     await page.locator('#repo-input').fill('test/repo');
@@ -99,7 +100,7 @@ test.describe('Selection', () => {
 
     test('select all row is hidden before sync', async ({ page }) => {
       // Clear and reload
-      await page.evaluate(() => localStorage.clear());
+      await clearAppStorage(page);
       await page.reload();
 
       const selectAllRow = page.locator('#select-all-row');

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
+import { clearAppStorage, readNotificationsCache } from './storage-utils';
 
 // Helper to encode a thread_id into a node ID format
 // Real GitHub node IDs are base64 encoded and contain "thread_id:user_id"
@@ -50,7 +51,7 @@ test.describe('Mark Done', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
 
     // Sync to load notifications
     await page.locator('#repo-input').fill('test/repo');
@@ -396,7 +397,7 @@ test.describe('Mark Done', () => {
       await expect(countAll).toHaveText('1');
     });
 
-    test('localStorage is updated after marking done', async ({ page }) => {
+    test('IndexedDB is updated after marking done', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
         route.fulfill({ status: 204 });
       });
@@ -406,13 +407,10 @@ test.describe('Mark Done', () => {
 
       await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
 
-      const savedNotifications = await page.evaluate(() => {
-        const saved = localStorage.getItem('ghnotif_notifications');
-        return saved ? JSON.parse(saved) : [];
-      });
-
-      expect(savedNotifications.length).toBe(4);
-      expect(savedNotifications.find((n: { id: string }) => n.id === 'notif-1')).toBeUndefined();
+      const savedNotifications = await readNotificationsCache(page);
+      const savedList = savedNotifications as { id: string }[];
+      expect(savedList.length).toBe(4);
+      expect(savedList.find((n) => n.id === 'notif-1')).toBeUndefined();
     });
 
     test('selection is cleared for marked items', async ({ page }) => {
@@ -608,7 +606,7 @@ test.describe('Mark Done with Node IDs', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
 
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();

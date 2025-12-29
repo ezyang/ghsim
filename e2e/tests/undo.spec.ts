@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import mixedFixture from '../fixtures/notifications_mixed.json';
+import { clearAppStorage, readNotificationsCache } from './storage-utils';
 
 // Fixture with authenticity_token included
 const undoToken = 'test-undo-token-12345';
@@ -51,7 +52,7 @@ test.describe('Undo', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
 
     // Sync to load notifications
     await page.locator('#repo-input').fill('test/repo');
@@ -176,7 +177,7 @@ test.describe('Undo', () => {
       await expect(page.locator('[data-id="notif-1"]')).toBeVisible();
     });
 
-    test('localStorage is updated after undo', async ({ page }) => {
+    test('IndexedDB is updated after undo', async ({ page }) => {
       await page.route('**/notifications/html/action', (route) => {
         route.fulfill({
           status: 200,
@@ -191,23 +192,15 @@ test.describe('Undo', () => {
       await expect(page.locator('#status-bar')).toContainText('Done 1/1 (0 pending)');
       await expect(page.locator('.notification-item')).toHaveCount(2);
 
-      // Check localStorage after mark done
-      let savedNotifications = await page.evaluate(() => {
-        const saved = localStorage.getItem('ghnotif_notifications');
-        return saved ? JSON.parse(saved) : [];
-      });
-      expect(savedNotifications.length).toBe(4);
+      let savedNotifications = await readNotificationsCache(page);
+      expect((savedNotifications as unknown[]).length).toBe(4);
 
       // Undo
       await page.keyboard.press('u');
       await expect(page.locator('#status-bar')).toContainText('Undo successful');
 
-      // Check localStorage after undo
-      savedNotifications = await page.evaluate(() => {
-        const saved = localStorage.getItem('ghnotif_notifications');
-        return saved ? JSON.parse(saved) : [];
-      });
-      expect(savedNotifications.length).toBe(5);
+      savedNotifications = await readNotificationsCache(page);
+      expect((savedNotifications as unknown[]).length).toBe(5);
     });
   });
 

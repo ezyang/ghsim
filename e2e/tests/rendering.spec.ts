@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clearAppStorage } from './storage-utils';
 
 /**
  * Phase 4: Notification Rendering Tests
@@ -165,7 +166,7 @@ test.describe('Notification Rendering', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
 
     // Trigger sync
     await page.locator('#repo-input').fill('test/repo');
@@ -489,7 +490,7 @@ test.describe('XSS Prevention', () => {
     });
 
     await page.goto('notifications.html');
-    await page.evaluate(() => localStorage.clear());
+    await clearAppStorage(page);
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
     await expect(page.locator('#status-bar')).toContainText('Synced');

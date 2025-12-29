@@ -8,9 +8,10 @@ import { test, expect } from '@playwright/test';
 
 test.describe('UI Shell', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage before each test
+    // Clear cached storage before each test
     await page.addInitScript(() => {
       localStorage.clear();
+      indexedDB.deleteDatabase('ghnotif_cache');
     });
 
     // Mock the auth endpoint to avoid real API calls
@@ -196,6 +197,7 @@ test.describe('Repository Input', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.clear();
+      indexedDB.deleteDatabase('ghnotif_cache');
     });
 
     await page.route('**/github/rest/user', (route) => {
@@ -258,6 +260,7 @@ test.describe('Sync Button', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.clear();
+      indexedDB.deleteDatabase('ghnotif_cache');
     });
 
     await page.route('**/github/rest/user', (route) => {
@@ -361,6 +364,7 @@ test.describe('Status Bar', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.clear();
+      indexedDB.deleteDatabase('ghnotif_cache');
     });
 
     await page.route('**/github/rest/user', (route) => {

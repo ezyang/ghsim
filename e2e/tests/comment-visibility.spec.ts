@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { clearAppStorage, seedCommentCache } from './storage-utils';
 
 const notificationsResponse = {
   source_url: 'https://github.com/notifications?query=repo:test/repo',
@@ -100,14 +101,15 @@ test.describe('Comment visibility', () => {
       },
     };
 
-    await page.addInitScript((cache) => {
+    await page.goto('notifications.html');
+    await clearAppStorage(page);
+    await page.evaluate(() => {
       localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
       localStorage.setItem('ghnotif_comment_expand_enabled', 'true');
       localStorage.setItem('ghnotif_comment_hide_uninteresting', 'false');
-      localStorage.setItem('ghnotif_bulk_comment_cache_v1', JSON.stringify(cache));
-    }, commentCache);
-
-    await page.goto('notifications.html');
+    });
+    await seedCommentCache(page, commentCache);
+    await page.reload();
 
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
@@ -302,14 +304,15 @@ test.describe('Own comment filtering', () => {
       },
     };
 
-    await page.addInitScript((cache) => {
+    await page.goto('notifications.html');
+    await clearAppStorage(page);
+    await page.evaluate(() => {
       localStorage.setItem('ghnotif_comment_prefetch_enabled', 'true');
       localStorage.setItem('ghnotif_comment_expand_enabled', 'true');
       localStorage.setItem('ghnotif_comment_hide_uninteresting', 'false');
-      localStorage.setItem('ghnotif_bulk_comment_cache_v1', JSON.stringify(cache));
-    }, commentCache);
-
-    await page.goto('notifications.html');
+    });
+    await seedCommentCache(page, commentCache);
+    await page.reload();
 
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
