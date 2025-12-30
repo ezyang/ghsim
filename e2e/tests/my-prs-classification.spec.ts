@@ -117,6 +117,17 @@ test.describe('My PR classification', () => {
       });
     });
 
+    await page.route('**/github/rest/repos/**/issues/**', (route) => {
+      if (route.request().url().includes('/comments')) {
+        return;
+      }
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ id: 1, body: '', user: { login: 'testuser' } }),
+      });
+    });
+
     await page.goto('notifications.html');
     await clearAppStorage(page);
   });
