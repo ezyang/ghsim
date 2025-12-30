@@ -60,8 +60,9 @@ test.describe('Mark Done', () => {
       });
     });
 
-    // Mock REST comment endpoints for prefetch
-    await page.route('**/github/rest/repos/**/issues/**/comments**', (route) => {
+    // Mock REST comment endpoints for prefetch and sync
+    // Use single * for issue number segment, not ** which matches multiple segments
+    await page.route('**/github/rest/repos/**/issues/*/comments', (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -850,8 +851,9 @@ test.describe('Mark Done with Node IDs', () => {
       });
     });
 
-    // Mock REST comment endpoints for prefetch
-    await page.route('**/github/rest/repos/**/issues/**/comments**', (route) => {
+    // Mock REST comment endpoints for prefetch and sync
+    // Use single * for issue number segment, not ** which matches multiple segments
+    await page.route('**/github/rest/repos/**/issues/*/comments', (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
