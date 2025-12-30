@@ -70,6 +70,15 @@ test.describe('Comment visibility', () => {
       });
     });
 
+    // Mock comments endpoint for syncNotificationBeforeDone
+    await page.route('**/github/rest/repos/**/issues/*/comments', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
+
     const commentCache = {
       version: 1,
       threads: {
@@ -325,6 +334,15 @@ test.describe('Own comment filtering', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify(notificationsResponse),
+      });
+    });
+
+    // Mock comments endpoint for syncNotificationBeforeDone
+    await page.route('**/github/rest/repos/**/issues/*/comments', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
       });
     });
 
