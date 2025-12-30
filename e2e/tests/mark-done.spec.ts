@@ -650,14 +650,6 @@ test.describe('Mark Done', () => {
   test.describe('Error Handling', () => {
     test('shows error when API fails', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         route.fulfill({ status: 500 });
       });
 
@@ -671,14 +663,6 @@ test.describe('Mark Done', () => {
 
     test('failed notifications remain in list', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         route.fulfill({ status: 500 });
       });
 
@@ -695,22 +679,6 @@ test.describe('Mark Done', () => {
       let callCount = 0;
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-
-        if (route.request().method() === 'GET') {
-
-          route.fulfill({
-
-            status: 200,
-
-            contentType: 'application/json',
-
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-
-          });
-
-          return;
-
-        }
         callCount++;
         // First call succeeds, second fails
         if (callCount === 1) {
@@ -732,22 +700,6 @@ test.describe('Mark Done', () => {
       let callCount = 0;
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-
-        if (route.request().method() === 'GET') {
-
-          route.fulfill({
-
-            status: 200,
-
-            contentType: 'application/json',
-
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-
-          });
-
-          return;
-
-        }
         callCount++;
         if (callCount === 1) {
           route.fulfill({ status: 204 });
@@ -771,14 +723,6 @@ test.describe('Mark Done', () => {
   test.describe('UI State During Operation', () => {
     test('Mark Done button is disabled during operation', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         await new Promise((r) => setTimeout(r, 200));
         route.fulfill({ status: 204 });
       });
@@ -793,14 +737,6 @@ test.describe('Mark Done', () => {
 
     test('Select All checkbox is disabled during operation', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', async (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         await new Promise((r) => setTimeout(r, 200));
         route.fulfill({ status: 204 });
       });
@@ -815,14 +751,6 @@ test.describe('Mark Done', () => {
 
     test('buttons are re-enabled after completion', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         route.fulfill({ status: 204 });
       });
 
