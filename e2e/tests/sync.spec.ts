@@ -1015,9 +1015,11 @@ test.describe('Sync Functionality', () => {
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
 
-    await expect(page.locator('#status-bar')).toContainText('requesting page 1');
-    await expect(page.locator('#status-bar')).toHaveClass(/auto-dismiss/);
-    await expect(page.locator('#status-bar')).toContainText('Synced');
+    const statusBar = page.locator('#status-bar');
+    await expect(statusBar).toContainText('requesting page 1');
+    await expect(statusBar).not.toHaveClass(/auto-dismiss/);
+    await expect(statusBar).toContainText('Synced');
+    await expect(statusBar).toHaveClass(/auto-dismiss/);
   });
 
   test('sync hides empty state when notifications exist', async ({ page }) => {

@@ -394,7 +394,7 @@ test.describe('Mark Done', () => {
 
       await expect(page.locator('#status-bar')).toContainText('New comments');
       await expect(page.locator('#status-bar')).toHaveClass(/auto-dismiss/);
-      await expect(page.locator('#status-bar')).toBeHidden({ timeout: 4000 });
+      await expect(page.locator('#status-bar')).toBeHidden({ timeout: 7000 });
       await expect(
         page.locator('[data-id="notif-1"] .notification-title')
       ).toContainText('Fix critical bug in authentication (updated)');
@@ -600,7 +600,7 @@ test.describe('Mark Done', () => {
       await expect(statusBar).toContainText('Done');
       await expect(statusBar).toContainText('(0 pending)');
       await expect(statusBar).toHaveClass(/auto-dismiss/);
-      await expect(statusBar).toBeHidden({ timeout: 5000 });
+      await expect(statusBar).toBeHidden({ timeout: 7000 });
     });
 
     test('progress bar appears during Mark Done operation', async ({ page }) => {

@@ -32,6 +32,8 @@
             statusState: null,
             statusTimer: null,
             statusFlashId: 0,
+            statusAutoDismissTimer: null,
+            statusAutoDismissId: 0,
             lastPersistentStatus: null,
             view: 'issues', // 'issues', 'my-prs', 'others-prs'
             viewFilters: JSON.parse(JSON.stringify(DEFAULT_VIEW_FILTERS)),

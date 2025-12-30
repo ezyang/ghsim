@@ -647,7 +647,9 @@
                     scheduleCommentPrefetch(notifications);
                 }
 
-                showStatus(`Synced ${notifications.length} notifications`, 'success');
+                showStatus(`Synced ${notifications.length} notifications`, 'success', {
+                    autoDismiss: true,
+                });
                 render();
 
             } catch (e) {
@@ -660,13 +662,50 @@
             }
         }
 
+        const DEFAULT_FLASH_DURATION_MS = 1500;
+        const DEFAULT_AUTO_DISMISS_MS = 4500;
+
+        function clearStatusAutoDismiss() {
+            if (state.statusAutoDismissTimer) {
+                clearTimeout(state.statusAutoDismissTimer);
+                state.statusAutoDismissTimer = null;
+            }
+            elements.statusBar.classList.remove('auto-dismiss');
+            elements.statusBar.style.removeProperty('--status-dismiss-duration');
+        }
+
+        function clearStatusBar() {
+            if (state.statusTimer) {
+                clearTimeout(state.statusTimer);
+                state.statusTimer = null;
+            }
+            clearStatusAutoDismiss();
+            elements.statusBar.textContent = '';
+            elements.statusBar.className = 'status-bar';
+            state.statusState = null;
+            state.lastPersistentStatus = null;
+        }
+
+        elements.statusBar.addEventListener('click', () => {
+            if (!elements.statusBar.classList.contains('visible')) {
+                return;
+            }
+            clearStatusBar();
+        });
+
         // Show status message
         function showStatus(message, type, options) {
             const settings = options || {};
             const flash = Boolean(settings.flash);
+            const autoDismiss = Boolean(settings.autoDismiss) && !flash;
             const flashDurationMs = Number.isFinite(settings.durationMs)
                 ? settings.durationMs
-                : 1500;
+                : DEFAULT_FLASH_DURATION_MS;
+            const autoDismissDurationMs = Number.isFinite(settings.autoDismissMs)
+                ? settings.autoDismissMs
+                : (Number.isFinite(settings.durationMs)
+                    ? settings.durationMs
+                    : DEFAULT_AUTO_DISMISS_MS);
 
             if (
                 flash &&
@@ -677,6 +716,7 @@
                 return;
             }
 
+            clearStatusAutoDismiss();
             if (state.statusTimer) {
                 clearTimeout(state.statusTimer);
                 state.statusTimer = null;
@@ -696,8 +736,24 @@
             const flashId = flash ? (state.statusFlashId += 1) : null;
             applyStatus(message, type, flash, flashId);
 
-            if (!flash) {
+            if (!flash && !autoDismiss) {
                 state.lastPersistentStatus = { message, type };
+                return;
+            }
+            if (autoDismiss) {
+                state.lastPersistentStatus = null;
+                const autoDismissId = (state.statusAutoDismissId += 1);
+                elements.statusBar.classList.add('auto-dismiss');
+                elements.statusBar.style.setProperty(
+                    '--status-dismiss-duration',
+                    `${autoDismissDurationMs}ms`
+                );
+                state.statusAutoDismissTimer = setTimeout(() => {
+                    if (!state.statusState || state.statusAutoDismissId !== autoDismissId) {
+                        return;
+                    }
+                    clearStatusBar();
+                }, autoDismissDurationMs);
                 return;
             }
 

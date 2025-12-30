@@ -137,7 +137,9 @@
             if (total === 0) {
                 return;
             }
-            showStatus(`Done ${done}/${total} (${pending} pending)`, 'success');
+            showStatus(`Done ${done}/${total} (${pending} pending)`, 'success', {
+                autoDismiss: pending === 0,
+            });
         }
 
         function queueDoneSnapshot(count) {
@@ -230,7 +232,8 @@
                 } else {
                     showStatus(
                         `Skipped ${blockedResults.length} notification${blockedResults.length !== 1 ? 's' : ''}: new comments found`,
-                        'info'
+                        'info',
+                        { autoDismiss: true }
                     );
                 }
                 render();
@@ -330,7 +333,8 @@
             } else if (successfulIds.length === 0 && allFailedResults.length === 0) {
                 showStatus(
                     `Skipped ${blockedResults.length} notification${blockedResults.length !== 1 ? 's' : ''}: new comments found`,
-                    'info'
+                    'info',
+                    { autoDismiss: true }
                 );
             } else if (successfulIds.length === 0) {
                 // All failed - show first error for context
@@ -343,7 +347,8 @@
             } else if (allFailedResults.length === 0) {
                 showStatus(
                     `Marked ${successfulIds.length} done, ${blockedResults.length} skipped (new comments)`,
-                    'info'
+                    'info',
+                    { autoDismiss: true }
                 );
             } else {
                 // Partial failure
@@ -408,7 +413,8 @@
             }
             showStatus(
                 `Opened ${openedCount} notification${openedCount !== 1 ? 's' : ''}`,
-                'success'
+                'success',
+                { autoDismiss: true }
             );
         }
 
@@ -517,7 +523,11 @@
 
             // Show result message with details
             if (failedResults.length === 0) {
-                showStatus(`Unsubscribed from ${successfulIds.length} notification${successfulIds.length !== 1 ? 's' : ''}`, 'success');
+                showStatus(
+                    `Unsubscribed from ${successfulIds.length} notification${successfulIds.length !== 1 ? 's' : ''}`,
+                    'success',
+                    { autoDismiss: true }
+                );
             } else if (successfulIds.length === 0) {
                 const firstError = failedResults[0].error;
                 showStatus(`Failed to unsubscribe: ${firstError}`, 'error');
@@ -919,7 +929,9 @@
 
             const syncResult = await syncNotificationBeforeDone(notifId, notificationToRemove);
             if (syncResult?.status === 'updated') {
-                showStatus('New comments found. Reloaded notification.', 'info');
+                showStatus('New comments found. Reloaded notification.', 'info', {
+                    autoDismiss: true,
+                });
                 if (syncResult.updatedNotification) {
                     const index = state.notifications.findIndex(
                         notification => notification.id === notifId
@@ -1251,7 +1263,8 @@
                         `Undo successful: restored ${restoredCount} notification${
                             restoredCount !== 1 ? 's' : ''
                         }`,
-                        'success'
+                        'success',
+                        { autoDismiss: true }
                     );
                 } else {
                     updateUndoEntry(undoItem, failedNotifications);
