@@ -394,7 +394,11 @@ test.describe('Mark Done', () => {
 
       await expect(page.locator('#status-bar')).toContainText('New comments');
       await expect(page.locator('#status-bar')).toHaveClass(/auto-dismiss/);
-      await expect(page.locator('#status-bar')).toBeHidden({ timeout: 7000 });
+      const statusBar = page.locator('#status-bar');
+      await statusBar.click();
+      await expect(statusBar).toHaveClass(/status-pinned/);
+      await statusBar.click();
+      await expect(statusBar).toBeHidden({ timeout: 7000 });
       await expect(
         page.locator('[data-id="notif-1"] .notification-title')
       ).toContainText('Fix critical bug in authentication (updated)');
