@@ -71,6 +71,8 @@
             authenticity_token: null, // CSRF token for HTML form actions
             undoStack: [], // Stack of {action, notifications, timestamp}
             undoInProgress: false,
+            // Mobile UI state
+            mobileSelectMode: false,
         };
 
         // DOM elements
@@ -110,6 +112,11 @@
             progressText: document.getElementById('progress-text'),
             keyboardShortcutsOverlay: document.getElementById('keyboard-shortcuts-overlay'),
             keyboardShortcutsClose: document.getElementById('keyboard-shortcuts-close'),
+            // Mobile elements
+            mobileFilterSelect: document.getElementById('mobile-filter-select'),
+            mobileOrderSelect: document.getElementById('mobile-order-select'),
+            mobileSelectBtn: document.getElementById('mobile-select-btn'),
+            notificationsContainer: document.querySelector('.notifications-container'),
         };
 
         function normalizeViewFilters(raw) {
@@ -616,6 +623,17 @@
                 }
             });
 
+            // Mobile controls
+            if (elements.mobileSelectBtn) {
+                elements.mobileSelectBtn.addEventListener('click', toggleMobileSelectMode);
+            }
+            if (elements.mobileFilterSelect) {
+                elements.mobileFilterSelect.addEventListener('change', handleMobileFilterChange);
+            }
+            if (elements.mobileOrderSelect) {
+                elements.mobileOrderSelect.addEventListener('change', handleMobileOrderChange);
+            }
+
             // Check auth status (uses cached value if available)
             checkAuth();
             // Only refresh REST rate limit on init (it's free); skip GraphQL to save rate limit
@@ -688,6 +706,89 @@
                 const isVisible = tabs.dataset.forView === state.view;
                 tabs.classList.toggle('hidden', !isVisible);
             });
+            updateMobileFilterOptions();
+        }
+
+        // Mobile control handlers
+        function toggleMobileSelectMode() {
+            state.mobileSelectMode = !state.mobileSelectMode;
+            if (elements.notificationsContainer) {
+                elements.notificationsContainer.classList.toggle('select-mode', state.mobileSelectMode);
+            }
+            if (elements.mobileSelectBtn) {
+                elements.mobileSelectBtn.textContent = state.mobileSelectMode ? 'Done' : 'Select';
+            }
+            if (!state.mobileSelectMode) {
+                // Clear selection when exiting select mode
+                state.selected.clear();
+                render();
+            }
+        }
+
+        function getMobileFilterOptions() {
+            const options = [{ value: 'all', label: 'All' }];
+            if (state.view === 'issues') {
+                options.push({ value: 'open', label: 'Open' });
+                options.push({ value: 'closed', label: 'Closed' });
+            } else if (state.view === 'others-prs') {
+                options.push({ value: 'needs-review', label: 'Needs review' });
+                options.push({ value: 'approved', label: 'Approved' });
+                options.push({ value: 'draft', label: 'Draft' });
+                options.push({ value: 'closed', label: 'Closed' });
+            }
+            return options;
+        }
+
+        function updateMobileFilterOptions() {
+            if (!elements.mobileFilterSelect) {
+                return;
+            }
+            const options = getMobileFilterOptions();
+            elements.mobileFilterSelect.innerHTML = '';
+            options.forEach(opt => {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.label;
+                elements.mobileFilterSelect.appendChild(option);
+            });
+            // Set current value
+            const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
+            const currentFilter = viewFilters.state || 'all';
+            elements.mobileFilterSelect.value = currentFilter;
+
+            // Sync order select
+            if (elements.mobileOrderSelect) {
+                elements.mobileOrderSelect.value = state.orderBy;
+            }
+        }
+
+        function handleMobileFilterChange(event) {
+            const value = event.target.value;
+            if (!state.viewFilters[state.view]) {
+                state.viewFilters[state.view] = {
+                    ...DEFAULT_VIEW_FILTERS[state.view],
+                };
+            }
+            state.viewFilters[state.view].state = value;
+            localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(state.viewFilters));
+            render();
+        }
+
+        function handleMobileOrderChange(event) {
+            const nextOrder = event.target.value;
+            if (!VALID_ORDERS.has(nextOrder)) {
+                return;
+            }
+            state.orderBy = nextOrder;
+            state.viewOrders[state.view] = nextOrder;
+            localStorage.setItem(ORDER_BY_VIEW_KEY, JSON.stringify(state.viewOrders));
+            if (elements.orderSelect) {
+                elements.orderSelect.value = nextOrder;
+            }
+            if (nextOrder === 'size' && state.view !== 'issues') {
+                maybePrefetchReviewMetadata();
+            }
+            render();
         }
 
         function isMyPr(notification) {

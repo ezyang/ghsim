@@ -125,11 +125,31 @@
             margin-bottom: 4px;
         }
 
+        .notification-item.unread::before {
+            content: none;
+        }
+
+        .notification-item.selected::before,
+        .notification-item.keyboard-selected::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background-color: var(--color-accent-fg);
+        }
+
         .subfilter-row {
             display: flex;
             flex-wrap: wrap;
             align-items: center;
             gap: 12px;
+        }
+
+        /* Mobile filter row - hidden on desktop */
+        .mobile-filter-row {
+            display: none;
         }
 
         .subfilter-stack {
@@ -206,21 +226,6 @@
             align-items: center;
             justify-content: space-between;
             gap: 8px;
-        }
-
-        .rate-limit-explain-btn {
-            border: 1px solid var(--color-border-muted);
-            background: var(--color-bg-default);
-            color: var(--color-fg-muted);
-            border-radius: 999px;
-            padding: 2px 8px;
-            font-size: 11px;
-            cursor: pointer;
-        }
-
-        .rate-limit-explain-btn:hover {
-            color: var(--color-fg-default);
-            border-color: var(--color-border-default);
         }
 
         .rate-limit-details {
@@ -321,7 +326,7 @@
             .notification-item {
                 flex-wrap: wrap;
                 gap: 8px;
-                padding: 12px 10px;
+                padding: 12px 8px;
             }
 
             .notification-icon {
@@ -339,13 +344,13 @@
 
             .notification-title {
                 order: 2;
-                flex: 1 1 calc(100% - 24px);
+                flex: 0 1 auto;
                 min-width: 0;
             }
 
             .notification-author {
-                order: 3;
-                flex: 0 1 auto;
+                order: 2;
+                flex: 0 0 auto;
             }
 
             .notification-meta {
@@ -355,15 +360,27 @@
                 gap: 6px;
             }
 
+            /* Hide unnecessary meta on mobile - keep only diffstat */
+            .notification-meta .notification-number,
+            .notification-meta .state-badge,
+            .notification-meta .notification-reason {
+                display: none;
+            }
+
             .comment-list {
                 order: 6;
                 flex-basis: 100%;
-                margin-top: 8px;
-                gap: 6px;
+                margin: 0 -8px -12px -8px;
+                padding: 0;
+                gap: 0;
             }
 
             .comment-item {
-                padding: 8px;
+                padding: 10px 8px;
+                border: none;
+                border-radius: 0;
+                border-top: 1px solid var(--color-border-muted);
+                background: var(--color-bg-default);
             }
 
             .notification-actions-bottom {
@@ -392,6 +409,45 @@
             .notification-checkbox {
                 order: 3;
                 margin-left: auto;
+                display: none;
+            }
+
+            .notifications-container.select-mode .notification-checkbox {
+                display: block;
+            }
+
+            .select-all-row {
+                display: none !important;
+            }
+
+            .notifications-container.select-mode .select-all-row {
+                display: flex !important;
+            }
+
+            /* Mobile filter controls: dropdown + select button on one line */
+            .mobile-filter-row {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px var(--notifications-padding);
+            }
+
+            .mobile-filter-select {
+                flex: 1;
+                min-width: 0;
+            }
+
+            .mobile-select-btn {
+                flex-shrink: 0;
+            }
+
+            /* Hide desktop subfilter tabs on mobile */
+            .subfilter-stack {
+                display: none;
+            }
+
+            .order-control {
+                display: none;
             }
         }
     </style>
@@ -462,9 +518,6 @@
             <div id="rate-limit-box" class="rate-limit-box">
                 <div class="rate-limit-row">
                     <span id="rate-limit-summary">Rate limit: unknown</span>
-                    <button id="rate-limit-explain-btn" class="rate-limit-explain-btn" type="button" aria-expanded="false">
-                        Explain
-                    </button>
                 </div>
                 <div id="rate-limit-details" class="rate-limit-details" hidden>
                     <div id="rate-limit-log-status" class="rate-limit-log-status">
@@ -588,6 +641,20 @@
                         <option value="size">PR size (small to big)</option>
                     </select>
                 </div>
+            </div>
+
+            <!-- Mobile filter row: dropdown + select button -->
+            <div class="mobile-filter-row">
+                <select id="mobile-filter-select" class="mobile-filter-select" aria-label="Filter notifications">
+                    <!-- Options populated by JS based on current view -->
+                </select>
+                <select id="mobile-order-select" class="mobile-filter-select" aria-label="Order notifications">
+                    <option value="recent">Newest first</option>
+                    <option value="size">PR size (small to big)</option>
+                </select>
+                <button id="mobile-select-btn" class="btn btn-small mobile-select-btn" type="button">
+                    Select
+                </button>
             </div>
 
             <div id="select-all-row" class="select-all-row" style="display: none;">
@@ -999,7 +1066,7 @@
                                 state.currentUserLogin = null;
                                 return;
                             }
-                            elements.authStatus.textContent = 'Auth status not checked';
+                            elements.authStatus.textContent = '';
                             elements.authStatus.className = 'auth-status';
                             state.currentUserLogin = null;
                         }
