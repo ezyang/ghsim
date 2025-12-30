@@ -665,10 +665,6 @@
             }
 
             const viewFilters = state.viewFilters[view] || DEFAULT_VIEW_FILTERS[view];
-            const authorFilter = viewFilters.author || 'all';
-            if (authorFilter === 'committer' || authorFilter === 'external') {
-                maybePrefetchReviewMetadata({ includeAuthorAssociation: true });
-            }
             render();
         }
 
@@ -684,16 +680,6 @@
             state.viewFilters[state.view][group] = next;
             localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(state.viewFilters));
 
-            if (group === 'author' && (next === 'committer' || next === 'external')) {
-                maybePrefetchReviewMetadata({ force: true, includeAuthorAssociation: true });
-            }
-            if (
-                state.view === 'others-prs' &&
-                group === 'state' &&
-                (next === 'needs-review' || next === 'approved')
-            ) {
-                maybePrefetchReviewMetadata();
-            }
             render();
         }
 
