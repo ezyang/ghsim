@@ -121,7 +121,7 @@ test.describe('Keyboard Shortcuts', () => {
   });
 
   test('e marks the active notification as done', async ({ page }) => {
-    let releaseReload;
+    let releaseReload: () => void = () => {};
     const reloadGate = new Promise<void>((resolve) => {
       releaseReload = resolve;
     });
