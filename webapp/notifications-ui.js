@@ -663,7 +663,7 @@
         }
 
         const DEFAULT_FLASH_DURATION_MS = 500;
-        const DEFAULT_AUTO_DISMISS_MS = 3500;
+        const DEFAULT_AUTO_DISMISS_MS = 2500;
 
         function clearStatusAutoDismiss() {
             if (state.statusAutoDismissTimer) {
