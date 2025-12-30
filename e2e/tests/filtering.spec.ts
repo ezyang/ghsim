@@ -362,6 +362,23 @@ test.describe('Filtering', () => {
       await expect(page.locator('.notification-item')).toHaveCount(1);
       await expect(page.locator('[data-id="notif-4"]')).toBeVisible();
     });
+
+    test('review metadata prefetch status uses auto-dismiss styling', async ({ page }) => {
+      const input = page.locator('#repo-input');
+      await input.fill('test/repo');
+      await page.locator('#sync-btn').click();
+      await expect(page.locator('.notification-item')).toHaveCount(3);
+
+      await page.locator('#view-others-prs').click();
+      const authorFilters = page.locator(
+        '.subfilter-tabs[data-for-view="others-prs"][data-subfilter-group="author"]'
+      );
+      await authorFilters.locator('[data-subfilter="committer"]').click();
+
+      const statusBar = page.locator('#status-bar');
+      await expect(statusBar).toContainText('Review metadata prefetch: fetching');
+      await expect(statusBar).toHaveClass(/auto-dismiss/);
+    });
   });
 
   test.describe('Subfilter Switching', () => {

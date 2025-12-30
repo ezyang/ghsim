@@ -584,14 +584,6 @@ test.describe('Mark Done', () => {
   test.describe('Removing Marked Notifications', () => {
     test('successfully marked notifications are removed from the list', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         route.fulfill({ status: 204 });
       });
 
@@ -610,14 +602,6 @@ test.describe('Mark Done', () => {
 
     test('notification count updates after marking done', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         route.fulfill({ status: 204 });
       });
 
@@ -636,14 +620,6 @@ test.describe('Mark Done', () => {
 
     test('IndexedDB is updated after marking done', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         route.fulfill({ status: 204 });
       });
 
@@ -660,14 +636,6 @@ test.describe('Mark Done', () => {
 
     test('selection is cleared for marked items', async ({ page }) => {
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         route.fulfill({ status: 204 });
       });
 
