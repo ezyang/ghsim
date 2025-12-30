@@ -58,8 +58,8 @@ test.describe('Filtering', () => {
       });
     });
 
-    // Mock REST comment endpoints for prefetch
-    await page.route('**/github/rest/repos/**/issues/**/comments**', (route) => {
+    // Mock REST comment endpoints for prefetch and syncNotificationBeforeDone
+    await page.route('**/github/rest/repos/**/issues/*/comments', (route) => {
       route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -68,6 +68,7 @@ test.describe('Filtering', () => {
     });
 
     // Mock REST issues endpoint for prefetch
+    // Use broader pattern and filter out comments, to avoid route matching issues
     await page.route('**/github/rest/repos/**/issues/**', (route) => {
       if (route.request().url().includes('/comments')) {
         return; // Let the comments route handle this
