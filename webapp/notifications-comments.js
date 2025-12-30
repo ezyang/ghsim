@@ -820,6 +820,7 @@ function isBotAuthor(login) {
         'mergify',
         'pytorchbot',
         'pytorchmergebot',
+        'pytorch-bot',
         'htmlpurifierbot',
         'github-actions',
         'dependabot',
