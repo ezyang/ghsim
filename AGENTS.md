@@ -1,6 +1,6 @@
 - Do NOT attempt to install packages unless the user explicitly asks you to do
   so.  Only the packages specified in pyproject.toml are available.  You cannot add new packages.  If you desperately want another package, tell the user.
-- Use `webapp/notifications.html` as the default UI file to edit; do not add or modify other notification UI files unless explicitly requested.
+- Use `ghinbox/webapp/notifications.html` as the default UI file to edit; do not add or modify other notification UI files unless explicitly requested.
 - If you modified Python files, use "ruff check" to check lint, "ruff format" to autoformat files and "pyrefly check ." to typecheck.  Do NOT do this if the change is HTML+JS only.
 - Tests:
   - E2E (Playwright): run from `e2e/` via `npm test` (or `npm run test:headed|test:debug|test:ui`)

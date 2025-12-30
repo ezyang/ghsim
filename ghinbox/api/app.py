@@ -2,6 +2,7 @@
 FastAPI application for the HTML notifications API.
 """
 
+import importlib.resources
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,6 +19,25 @@ from ghinbox.api.fetcher import (
     run_fetcher_call,
     shutdown_fetcher_executor,
 )
+
+
+def _get_webapp_dir() -> Path | None:
+    """
+    Get the webapp static files directory.
+
+    Uses importlib.resources to locate the webapp directory, which works both
+    in source checkouts and installed packages.
+    """
+    try:
+        webapp_ref = importlib.resources.files("ghinbox").joinpath("webapp")
+        # For non-zipped installations, we can get the actual path
+        # Using str() on Traversable gives the path for real filesystem locations
+        webapp_path = Path(str(webapp_ref))
+        if webapp_path.is_dir():
+            return webapp_path
+    except (TypeError, ModuleNotFoundError):
+        pass
+    return None
 
 
 @asynccontextmanager
@@ -41,7 +61,7 @@ async def lifespan(app: FastAPI):
 
 
 # Static files directory for the webapp
-STATIC_DIR = Path(__file__).parent.parent.parent / "webapp"
+STATIC_DIR = _get_webapp_dir()
 
 app = FastAPI(
     lifespan=lifespan,
@@ -75,7 +95,7 @@ app.include_router(notifications_router)
 app.include_router(github_proxy_router)
 
 # Mount static files for the webapp (if directory exists)
-if STATIC_DIR.exists():
+if STATIC_DIR is not None:
     app.mount("/app", StaticFiles(directory=STATIC_DIR, html=True), name="webapp")
 
 
@@ -84,7 +104,7 @@ async def root():
     """Redirect to webapp or docs."""
     from fastapi.responses import RedirectResponse
 
-    if STATIC_DIR.exists():
+    if STATIC_DIR is not None:
         return RedirectResponse(url="/app/")
     return {"message": "See /docs for API documentation"}
 

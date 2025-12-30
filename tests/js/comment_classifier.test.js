@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 
-const htmlPath = path.resolve(process.cwd(), 'webapp/notifications.html');
+const htmlPath = path.resolve(process.cwd(), 'ghinbox/webapp/notifications.html');
 const html = fs.readFileSync(htmlPath, 'utf8');
 
 function extractFunctionSource(name) {
