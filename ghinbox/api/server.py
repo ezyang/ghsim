@@ -11,6 +11,7 @@ using the specified account's authenticated session.
 
 import argparse
 import sys
+from pathlib import Path
 
 import uvicorn
 
@@ -22,6 +23,14 @@ from ghinbox.auth import (
     DEFAULT_ACCOUNT,
 )
 from ghinbox.token import has_token, provision_token, verify_token
+
+
+def _is_source_checkout() -> bool:
+    """Check if running from a source checkout (has .git directory)."""
+    # Look for .git in the package's parent directory
+    package_dir = Path(__file__).parent.parent  # ghinbox/
+    repo_root = package_dir.parent  # parent of ghinbox/
+    return (repo_root / ".git").is_dir()
 
 
 def setup_default_account(headed: bool = False) -> tuple[bool, str | None]:
@@ -106,9 +115,15 @@ def main() -> int:
         help="Port to bind to (default: 8000)",
     )
     parser.add_argument(
+        "--reload",
+        action="store_true",
+        default=None,
+        help="Enable auto-reload on code changes (auto-enabled in source checkouts)",
+    )
+    parser.add_argument(
         "--no-reload",
         action="store_true",
-        help="Disable auto-reload on code changes",
+        help="Disable auto-reload even in source checkouts",
     )
     parser.add_argument(
         "--headed",
@@ -220,11 +235,22 @@ def main() -> int:
     print(f"API docs: http://{display_host}:{args.port}/docs")
     print()
 
+    # Determine reload behavior:
+    # - --no-reload: always disable
+    # - --reload: always enable
+    # - neither: auto-enable only in source checkouts
+    if args.no_reload:
+        reload = False
+    elif args.reload:
+        reload = True
+    else:
+        reload = _is_source_checkout()
+
     uvicorn.run(
         "ghinbox.api.app:app",
         host=args.host,
         port=args.port,
-        reload=not args.no_reload,
+        reload=reload,
     )
 
     return 0
