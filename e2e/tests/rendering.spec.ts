@@ -279,9 +279,18 @@ test.describe('Notification Rendering', () => {
       });
     });
 
+    const reviewMetadataResponse = page.waitForResponse((response) => {
+      if (!response.url().includes('/github/graphql')) {
+        return false;
+      }
+      const postData = response.request().postData() || '';
+      return postData.includes('pullRequest') && postData.includes('author');
+    });
+
     await clearAppStorage(page);
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
+    await reviewMetadataResponse;
     await page.locator('#view-others-prs').click();
 
     await expect(page.locator('[data-id="pr-open"] .notification-author')).toHaveText(
