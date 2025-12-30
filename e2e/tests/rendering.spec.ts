@@ -196,6 +196,99 @@ test.describe('Notification Rendering', () => {
     });
   });
 
+  test('shows PR author next to the title', async ({ page }) => {
+    await page.route('**/github/rest/repos/test/repo/issues/*', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          id: 123,
+          number: 10,
+          user: { login: 'pr-author' },
+          body: '',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }),
+      });
+    });
+
+    await page.route('**/github/rest/repos/test/repo/issues/*/comments*', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
+
+    await page.route('**/github/graphql', async (route) => {
+      const payload = route.request().postDataJSON();
+      if (payload?.query?.includes('repository')) {
+        route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            data: {
+              rateLimit: {
+                limit: 5000,
+                remaining: 4999,
+                resetAt: '2025-01-02T00:00:00Z',
+              },
+              repository: {
+                pr10: {
+                  reviewDecision: null,
+                  authorAssociation: null,
+                  additions: null,
+                  deletions: null,
+                  changedFiles: null,
+                  author: { login: 'pr-author' },
+                },
+                pr11: {
+                  reviewDecision: null,
+                  authorAssociation: null,
+                  additions: null,
+                  deletions: null,
+                  changedFiles: null,
+                  author: { login: 'merger' },
+                },
+                pr12: {
+                  reviewDecision: null,
+                  authorAssociation: null,
+                  additions: null,
+                  deletions: null,
+                  changedFiles: null,
+                  author: { login: 'closer' },
+                },
+              },
+            },
+          }),
+        });
+        return;
+      }
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            rateLimit: {
+              limit: 5000,
+              remaining: 4999,
+              resetAt: '2025-01-02T00:00:00Z',
+            },
+          },
+        }),
+      });
+    });
+
+    await clearAppStorage(page);
+    await page.locator('#repo-input').fill('test/repo');
+    await page.locator('#sync-btn').click();
+    await page.locator('#view-others-prs').click();
+
+    await expect(page.locator('[data-id="pr-open"] .notification-author')).toHaveText(
+      'by pr-author'
+    );
+  });
+
   test.describe('PR diffstat badge', () => {
     test('shows additions/deletions for pull requests', async ({ page }) => {
       await page.route('**/github/rest/repos/test/repo/issues/*', (route) => {
