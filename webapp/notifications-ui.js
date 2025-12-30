@@ -885,6 +885,24 @@
             return `<span class="state-badge ${cssClass}" data-state="${state}">${label}</span>`;
         }
 
+        function getPullRequestAuthorLogin(notification) {
+            if (notification.subject?.type !== 'PullRequest') {
+                return null;
+            }
+            const cached = state.commentCache?.threads?.[getNotificationKey(notification)];
+            if (!cached || cached.error) {
+                return null;
+            }
+            const login = cached.authorLogin;
+            if (!login) {
+                return null;
+            }
+            if (typeof isAuthorLoginFresh === 'function' && !isAuthorLoginFresh(cached)) {
+                return null;
+            }
+            return String(login);
+        }
+
         function getDiffstatHue(total, range) {
             if (!range || range.min === null || range.max === null) {
                 return null;
@@ -1084,6 +1102,10 @@
                         : null;
                     const diffstatHtml = diffstatInfo
                         ? `<span class="diffstat-tag" style="--diffstat-hue: ${diffstatHue}" title="${escapeHtml(diffstatInfo.title)}">+${diffstatInfo.additions}/-${diffstatInfo.deletions}</span>`
+                        : '';
+                    const authorLogin = getPullRequestAuthorLogin(notif);
+                    const authorHtml = authorLogin
+                        ? `<span class="notification-author">by ${escapeHtml(authorLogin)}</span>`
                         : '';
                     const commentItems = getCommentItems(notif);
                     const commentList = commentItems
