@@ -674,12 +674,26 @@
             elements.statusBar.style.removeProperty('--status-dismiss-duration');
         }
 
+        function freezeStatusAutoDismiss() {
+            if (state.statusAutoDismissTimer) {
+                clearTimeout(state.statusAutoDismissTimer);
+                state.statusAutoDismissTimer = null;
+            }
+            if (state.statusState) {
+                state.statusState.autoDismiss = false;
+            }
+            elements.statusBar.classList.remove('auto-dismiss');
+            elements.statusBar.style.removeProperty('--status-dismiss-duration');
+            elements.statusBar.classList.add('status-pinned');
+        }
+
         function clearStatusBar() {
             if (state.statusTimer) {
                 clearTimeout(state.statusTimer);
                 state.statusTimer = null;
             }
             clearStatusAutoDismiss();
+            elements.statusBar.classList.remove('status-pinned');
             elements.statusBar.textContent = '';
             elements.statusBar.className = 'status-bar';
             state.statusState = null;
@@ -688,6 +702,10 @@
 
         elements.statusBar.addEventListener('click', () => {
             if (!elements.statusBar.classList.contains('visible')) {
+                return;
+            }
+            if (elements.statusBar.classList.contains('auto-dismiss')) {
+                freezeStatusAutoDismiss();
                 return;
             }
             clearStatusBar();
@@ -730,6 +748,7 @@
                     type: nextType,
                     isFlash,
                     flashId,
+                    autoDismiss: false,
                 };
             }
 
@@ -742,7 +761,11 @@
             }
             if (autoDismiss) {
                 state.lastPersistentStatus = null;
+                if (state.statusState) {
+                    state.statusState.autoDismiss = true;
+                }
                 const autoDismissId = (state.statusAutoDismissId += 1);
+                elements.statusBar.classList.remove('status-pinned');
                 elements.statusBar.classList.add('auto-dismiss');
                 elements.statusBar.style.setProperty(
                     '--status-dismiss-duration',
@@ -766,9 +789,7 @@
                     applyStatus(last.message, last.type, false, null);
                     return;
                 }
-                elements.statusBar.textContent = '';
-                elements.statusBar.className = 'status-bar';
-                state.statusState = null;
+                clearStatusBar();
             }, flashDurationMs);
         }
 

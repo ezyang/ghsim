@@ -51,6 +51,11 @@
             animation: status-fade var(--status-dismiss-duration, 3000ms) ease-in forwards;
         }
 
+        .status-bar.status-pinned {
+            opacity: 1;
+            animation: none;
+        }
+
         .status-bar.auto-dismiss::after {
             content: '';
             position: absolute;

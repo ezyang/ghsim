@@ -591,6 +591,9 @@ test.describe('Mark Done', () => {
       await expect(statusBar).toContainText('(0 pending)');
       await expect(statusBar).toHaveClass(/auto-dismiss/);
       await statusBar.click();
+      await expect(statusBar).not.toHaveClass(/auto-dismiss/);
+      await expect(statusBar).toHaveClass(/status-pinned/);
+      await statusBar.click();
       await expect(statusBar).toBeHidden();
 
       await expect(page.locator('.notification-item')).toHaveCount(2);
