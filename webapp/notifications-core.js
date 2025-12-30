@@ -45,7 +45,6 @@
             markingInProgress: false, // Whether Mark Done is in progress
             markProgress: { current: 0, total: 0 }, // Progress tracking
             doneSnapshot: { pending: 0, done: 0 }, // Current done snapshot counts
-            commentPrefetchEnabled: true,
             commentExpandIssues: false,
             commentExpandPrs: false,
             commentHideUninteresting: false,
