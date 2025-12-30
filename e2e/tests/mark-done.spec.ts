@@ -148,16 +148,8 @@ test.describe('Mark Done', () => {
     test('clicking Mark Done calls API for each selected notification', async ({ page }) => {
       const apiCalls: string[] = [];
 
-      // Mock the mark done API
+      // Mock the mark done API (DELETE only)
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-        if (route.request().method() === 'GET') {
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-          });
-          return;
-        }
         apiCalls.push(route.request().url());
         route.fulfill({
           status: 204,
@@ -186,22 +178,6 @@ test.describe('Mark Done', () => {
       const apiCalls: string[] = [];
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-
-        if (route.request().method() === 'GET') {
-
-          route.fulfill({
-
-            status: 200,
-
-            contentType: 'application/json',
-
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-
-          });
-
-          return;
-
-        }
         apiCalls.push(route.request().url());
         route.fulfill({ status: 204 });
       });
@@ -222,22 +198,6 @@ test.describe('Mark Done', () => {
       let requestMethod = '';
 
       await page.route('**/github/rest/notifications/threads/**', (route) => {
-
-        if (route.request().method() === 'GET') {
-
-          route.fulfill({
-
-            status: 200,
-
-            contentType: 'application/json',
-
-            body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-
-          });
-
-          return;
-
-        }
         requestMethod = route.request().method();
         route.fulfill({ status: 204 });
       });
