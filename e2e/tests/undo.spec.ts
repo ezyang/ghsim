@@ -52,16 +52,17 @@ test.describe('Undo', () => {
       });
     });
 
+    // Mock comments endpoint for syncNotificationBeforeDone
+    await page.route('**/github/rest/repos/**/issues/*/comments', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([]),
+      });
+    });
+
     // Mock mark done API
     await page.route('**/github/rest/notifications/threads/**', (route) => {
-      if (route.request().method() === 'GET') {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-        });
-        return;
-      }
       route.fulfill({ status: 204 });
     });
 
