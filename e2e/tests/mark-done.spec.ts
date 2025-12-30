@@ -869,15 +869,7 @@ test.describe('Mark Done with Node IDs', () => {
     const apiCalls: string[] = [];
 
     // Mock REST API endpoint
-    await page.route('**/github/rest/notifications/threads/**', async (route) => {
-      if (route.request().method() === 'GET') {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-        });
-        return;
-      }
+    await page.route('**/github/rest/notifications/threads/**', (route) => {
       apiCalls.push(route.request().url());
       route.fulfill({ status: 204 });
     });
@@ -901,23 +893,7 @@ test.describe('Mark Done with Node IDs', () => {
   test('REST API uses DELETE method for node IDs', async ({ page }) => {
     let requestMethod = '';
 
-    await page.route('**/github/rest/notifications/threads/**', async (route) => {
-
-      if (route.request().method() === 'GET') {
-
-        route.fulfill({
-
-          status: 200,
-
-          contentType: 'application/json',
-
-          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-
-        });
-
-        return;
-
-      }
+    await page.route('**/github/rest/notifications/threads/**', (route) => {
       requestMethod = route.request().method();
       route.fulfill({ status: 204 });
     });
@@ -931,14 +907,6 @@ test.describe('Mark Done with Node IDs', () => {
 
   test('handles REST API errors for node IDs gracefully', async ({ page }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
-      if (route.request().method() === 'GET') {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-        });
-        return;
-      }
       route.fulfill({ status: 500 });
     });
 
@@ -952,14 +920,6 @@ test.describe('Mark Done with Node IDs', () => {
 
   test('removes notification after successful REST API mark done with node ID', async ({ page }) => {
     await page.route('**/github/rest/notifications/threads/**', (route) => {
-      if (route.request().method() === 'GET') {
-        route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify(THREAD_SYNC_PAYLOAD),
-        });
-        return;
-      }
       route.fulfill({ status: 204 });
     });
 
