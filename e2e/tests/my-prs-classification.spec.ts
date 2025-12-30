@@ -231,11 +231,17 @@ test.describe('My PR classification', () => {
       });
     });
 
-    const graphqlResponse = page.waitForResponse('**/github/graphql');
+    const reviewMetadataResponse = page.waitForResponse((response) => {
+      if (!response.url().includes('/github/graphql')) {
+        return false;
+      }
+      const postData = response.request().postData() || '';
+      return postData.includes('reviewDecision') && postData.includes('pullRequest');
+    });
     const input = page.locator('#repo-input');
     await input.fill('test/repo');
     await page.locator('#sync-btn').click();
-    await graphqlResponse;
+    await reviewMetadataResponse;
     await expect(page.locator('#status-bar')).toContainText('Synced 2 notifications');
 
     await page.locator('#view-others-prs').click();
