@@ -381,12 +381,6 @@
             }
 
             if (stateFilter === 'approved') {
-                if (!state.commentPrefetchEnabled) {
-                    return {
-                        title: 'Comment fetching disabled',
-                        message: 'Enable comment fetching to evaluate triage filters.',
-                    };
-                }
                 return {
                     title: 'No approved PRs',
                     message: 'No approved PR notifications are pending.',
@@ -573,42 +567,39 @@
                     new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
                 );
 
-                let notifications = sortedNotifications;
-                if (state.commentPrefetchEnabled) {
-                    const restLookupKeys =
-                        syncMode === 'incremental' && overlapIndex !== null && previousMatchMap
-                            ? buildIncrementalRestLookupKeys(allNotifications, previousMatchMap)
-                            : null;
-                    const missingCount = countMissingLastReadAt(sortedNotifications);
-                    const restMissingCount = countMissingLastReadAtForKeys(
-                        sortedNotifications,
-                        restLookupKeys
+                const restLookupKeys =
+                    syncMode === 'incremental' && overlapIndex !== null && previousMatchMap
+                        ? buildIncrementalRestLookupKeys(allNotifications, previousMatchMap)
+                        : null;
+                const missingCount = countMissingLastReadAt(sortedNotifications);
+                const restMissingCount = countMissingLastReadAtForKeys(
+                    sortedNotifications,
+                    restLookupKeys
+                );
+                if (missingCount > 0) {
+                    showStatus(
+                        restLookupKeys && restMissingCount !== missingCount
+                            ? `${syncLabel}: fetching last_read_at for ${restMissingCount}/${missingCount} notifications`
+                            : `${syncLabel}: fetching last_read_at for ${missingCount} notifications`,
+                        'info',
+                        { flash: true }
                     );
-                    if (missingCount > 0) {
-                        showStatus(
-                            restLookupKeys && restMissingCount !== missingCount
-                                ? `${syncLabel}: fetching last_read_at for ${restMissingCount}/${missingCount} notifications`
-                                : `${syncLabel}: fetching last_read_at for ${missingCount} notifications`,
-                            'info',
-                            { flash: true }
-                        );
-                    } else {
-                        showStatus(
-                            `${syncLabel}: last_read_at already present`,
-                            'info'
-                        );
-                    }
-                    notifications = await ensureLastReadAtData(sortedNotifications, {
-                        restLookupKeys,
-                    });
-                    const remainingMissing = countMissingLastReadAt(notifications);
-                    const filledCount = Math.max(missingCount - remainingMissing, 0);
-                    if (missingCount > 0) {
-                        showStatus(
-                            `${syncLabel}: filled last_read_at for ${filledCount}/${missingCount} notifications`,
-                            'info'
-                        );
-                    }
+                } else {
+                    showStatus(
+                        `${syncLabel}: last_read_at already present`,
+                        'info'
+                    );
+                }
+                let notifications = await ensureLastReadAtData(sortedNotifications, {
+                    restLookupKeys,
+                });
+                const remainingMissing = countMissingLastReadAt(notifications);
+                const filledCount = Math.max(missingCount - remainingMissing, 0);
+                if (missingCount > 0) {
+                    showStatus(
+                        `${syncLabel}: filled last_read_at for ${filledCount}/${missingCount} notifications`,
+                        'info'
+                    );
                 }
 
                 if (syncMode === 'incremental' && overlapIndex !== null) {
@@ -634,18 +625,8 @@
                 // Save to localStorage
                 persistNotifications();
 
-                const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
-                const authorFilter = viewFilters.author || 'all';
-                if (authorFilter === 'committer' || authorFilter === 'external') {
-                    if (typeof maybePrefetchReviewMetadata === 'function') {
-                        maybePrefetchReviewMetadata({ includeAuthorAssociation: true });
-                    }
-                }
-
-                if (state.commentPrefetchEnabled) {
-                    state.commentQueue = [];
-                    scheduleCommentPrefetch(notifications);
-                }
+                state.commentQueue = [];
+                scheduleCommentPrefetch(notifications);
 
                 showStatus(`Synced ${notifications.length} notifications`, 'success', {
                     autoDismiss: true,
@@ -1093,11 +1074,7 @@
                     const reason = formatReason(notif.reason);
                     const viewFilters = state.viewFilters[state.view] || DEFAULT_VIEW_FILTERS[state.view];
                     const stateFilter = viewFilters.state || 'all';
-                    const commentStatus =
-                        state.commentPrefetchEnabled ||
-                        ['needs-review', 'approved'].includes(stateFilter)
-                            ? getCommentStatus(notif)
-                            : null;
+                    const commentStatus = getCommentStatus(notif);
                     const commentBadge = commentStatus
                         ? `<span class="comment-tag ${commentStatus.className}">${escapeHtml(commentStatus.label)}</span>`
                         : '';
