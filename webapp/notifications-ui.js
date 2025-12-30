@@ -1191,6 +1191,7 @@
                                 <a href="${notif.subject.url}" class="notification-title" target="_blank" rel="noopener">
                                     ${renderInlineCode(notif.subject.title)}
                                 </a>
+                                ${authorHtml}
                                 <div class="notification-meta">
                                     ${notif.subject.number ? `<span class="notification-number">#${notif.subject.number}</span>` : ''}
                                     ${stateBadge}
