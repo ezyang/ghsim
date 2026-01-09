@@ -116,6 +116,7 @@
             keyboardShortcutsClose: document.getElementById('keyboard-shortcuts-close'),
             // Mobile elements
             mobileFilterSelect: document.getElementById('mobile-filter-select'),
+            mobileAuthorSelect: document.getElementById('mobile-author-select'),
             mobileOrderSelect: document.getElementById('mobile-order-select'),
             mobileSelectBtn: document.getElementById('mobile-select-btn'),
             notificationsContainer: document.querySelector('.notifications-container'),
@@ -641,11 +642,19 @@
             if (elements.mobileOrderSelect) {
                 elements.mobileOrderSelect.addEventListener('change', handleMobileOrderChange);
             }
+            if (elements.mobileAuthorSelect) {
+                elements.mobileAuthorSelect.addEventListener('change', handleMobileAuthorChange);
+            }
 
             // Check auth status (uses cached value if available)
             checkAuth();
             // Only refresh REST rate limit on init (it's free); skip GraphQL to save rate limit
             refreshRateLimit({ skipGraphql: true });
+
+            // Set initial data-view attribute on container for CSS targeting
+            if (elements.notificationsContainer) {
+                elements.notificationsContainer.dataset.view = state.view;
+            }
 
             // Initial render
             render();
@@ -683,6 +692,10 @@
             }
             state.view = view;
             localStorage.setItem(VIEW_KEY, view);
+            // Set data-view attribute on container for CSS targeting
+            if (elements.notificationsContainer) {
+                elements.notificationsContainer.dataset.view = view;
+            }
             updateSubfilterVisibility();
             state.orderBy = state.viewOrders[view] || DEFAULT_VIEW_ORDERS[view];
             if (elements.orderSelect) {
@@ -768,6 +781,12 @@
             if (elements.mobileOrderSelect) {
                 elements.mobileOrderSelect.value = state.orderBy;
             }
+
+            // Sync author select (only visible for others-prs view via CSS)
+            if (elements.mobileAuthorSelect) {
+                const currentAuthor = viewFilters.author || 'all';
+                elements.mobileAuthorSelect.value = currentAuthor;
+            }
         }
 
         function handleMobileFilterChange(event) {
@@ -796,6 +815,18 @@
             if (nextOrder === 'size' && state.view !== 'issues') {
                 maybePrefetchReviewMetadata();
             }
+            render();
+        }
+
+        function handleMobileAuthorChange(event) {
+            const value = event.target.value;
+            if (!state.viewFilters[state.view]) {
+                state.viewFilters[state.view] = {
+                    ...DEFAULT_VIEW_FILTERS[state.view],
+                };
+            }
+            state.viewFilters[state.view].author = value;
+            localStorage.setItem(VIEW_FILTERS_KEY, JSON.stringify(state.viewFilters));
             render();
         }
 
