@@ -224,7 +224,10 @@ def main() -> int:
                     if os.environ.get("GHINBOX_NEEDS_AUTH") != "1":
                         print("Re-provisioning token (browser window will open)...")
                         token = provision_token(
-                            account, force=True, headless=not args.headed_login, prod=True
+                            account,
+                            force=True,
+                            headless=not args.headed_login,
+                            prod=True,
                         )
                         if not token:
                             print("ERROR: Token re-provisioning failed")

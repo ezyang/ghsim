@@ -220,7 +220,9 @@ class LoginFetcher:
             matches = re.findall(r"\b(\d{2})\b", body_text)
             if matches:
                 # Return the first match (most likely the verification code)
-                logger.debug("Found potential verification code via regex: %s", matches[0])
+                logger.debug(
+                    "Found potential verification code via regex: %s", matches[0]
+                )
                 return matches[0]
 
             logger.warning("Could not find verification code on mobile 2FA page")
@@ -311,9 +313,7 @@ class LoginFetcher:
                 or "two-factor/security" in current_url
             ):
                 # Check if there's a link to use mobile instead
-                mobile_link = page.locator(
-                    "a[href*='two-factor/mobile']"
-                )
+                mobile_link = page.locator("a[href*='two-factor/mobile']")
                 mobile_link_count = await mobile_link.count()
                 if mobile_link_count > 0:
                     # Get the href and navigate directly (more reliable than clicking)
