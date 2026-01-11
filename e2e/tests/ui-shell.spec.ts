@@ -122,6 +122,8 @@ test.describe('Sync Button', () => {
   });
 
   test('validates repository input on sync', async ({ page }) => {
+    // Clear the repo input first (app defaults to 'pytorch/pytorch' when localStorage is empty)
+    await page.locator('#repo-input').fill('');
     await page.locator('#sync-btn').click();
     await expect(page.locator('#status-bar')).toContainText('Please enter a repository');
 
