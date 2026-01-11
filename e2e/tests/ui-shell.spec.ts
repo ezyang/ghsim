@@ -148,6 +148,15 @@ test.describe('Auth Status', () => {
       );
     }, 'testuser');
 
+    // Mock user endpoint as fallback if cache lookup fails
+    await page.route('**/github/rest/user', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ login: 'testuser' }),
+      });
+    });
+
     await page.goto('notifications.html');
 
     const authStatus = page.locator('#auth-status');

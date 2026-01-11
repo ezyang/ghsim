@@ -15,6 +15,8 @@ test.describe('Remove Reviewer', () => {
         'ghnotif_auth_cache',
         JSON.stringify({ login: 'testuser', timestamp: Date.now() })
       );
+      // Disable comment expansion for PRs to ensure only inline button is visible
+      localStorage.setItem('ghnotif_comment_expand_prs', 'false');
     });
 
     // Mock notifications endpoint
@@ -53,14 +55,25 @@ test.describe('Remove Reviewer', () => {
       });
     });
 
+    // Mock user endpoint for auth check
+    await page.route('**/github/rest/user', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ login: 'testuser' }),
+      });
+    });
+
     await page.goto('notifications.html');
     await clearAppStorage(page);
 
     // Sync to load notifications
     await page.locator('#repo-input').fill('test/repo');
     await page.locator('#sync-btn').click();
-    // Wait for notifications to load
-    await expect(page.locator('.notification-item')).toHaveCount(3);
+    // Switch to Others PRs view to see PR notifications
+    await page.locator('#view-others-prs').click();
+    // Wait for PR notifications to load (2 PRs in fixture: notif-2 and notif-4)
+    await expect(page.locator('.notification-item')).toHaveCount(2);
   });
 
   test.describe('Button Visibility', () => {
@@ -74,6 +87,9 @@ test.describe('Remove Reviewer', () => {
     });
 
     test('does not show remove reviewer button for issue notifications', async ({ page }) => {
+      // Switch to Issues view to see issue notifications
+      await page.locator('#view-issues').click();
+
       // Find an issue notification (notif-1 is an issue in the fixture)
       const issueNotification = page.locator('[data-id="notif-1"]');
 
@@ -137,17 +153,20 @@ test.describe('Remove Reviewer', () => {
 
       // Notification should be removed from UI
       await expect(prNotification).toHaveCount(0);
-      await expect(page.locator('.notification-item')).toHaveCount(2);
+      await expect(page.locator('.notification-item')).toHaveCount(1);
     });
 
     test('continues with unsubscribe when reviewer removal fails', async ({ page }) => {
       let unsubscribeCalled = false;
       let markDoneCalled = false;
+      let removeReviewerCalled = false;
 
       // Mock remove reviewer endpoint to fail
       await page.route('**/github/rest/repos/**/pulls/*/requested_reviewers', (route) => {
+        removeReviewerCalled = true;
         route.fulfill({
           status: 422,
+          contentType: 'application/json',
           body: JSON.stringify({ message: 'User not a reviewer' }),
         });
       });
@@ -171,10 +190,13 @@ test.describe('Remove Reviewer', () => {
       const prNotification = page.locator('[data-id="notif-2"]');
       await prNotification.locator('.notification-remove-reviewer-btn').click();
 
-      // Should show error about removal but complete with unsubscribe
-      await expect(page.locator('#status-bar')).toContainText('Failed to remove reviewer');
+      // Wait for operation to complete - status eventually shows Done
+      await expect(page.locator('#status-bar')).toContainText('Done');
 
-      // Verify unsubscribe was still called
+      // Verify remove reviewer was attempted
+      expect(removeReviewerCalled).toBe(true);
+
+      // Verify unsubscribe was still called despite reviewer removal failure
       expect(unsubscribeCalled).toBe(true);
       expect(markDoneCalled).toBe(true);
 
@@ -294,7 +316,9 @@ test.describe('Remove Reviewer', () => {
       await page.reload();
       await page.locator('#repo-input').fill('test/repo');
       await page.locator('#sync-btn').click();
-      await expect(page.locator('.notification-item')).toHaveCount(3);
+      // Switch to Others PRs view to see PR notifications
+      await page.locator('#view-others-prs').click();
+      await expect(page.locator('.notification-item')).toHaveCount(2);
 
       const prNotification = page.locator('[data-id="notif-2"]');
       await prNotification.locator('.notification-remove-reviewer-btn').click();

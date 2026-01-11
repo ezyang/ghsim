@@ -51,6 +51,15 @@ test.describe('Mark Done', () => {
       });
     });
 
+    // Mock user endpoint for auth check
+    await page.route('**/github/rest/user', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ login: 'testuser' }),
+      });
+    });
+
     // Mock GraphQL endpoint for prefetch
     await page.route('**/github/graphql', (route) => {
       route.fulfill({
