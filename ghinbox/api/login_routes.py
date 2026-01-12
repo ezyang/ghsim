@@ -627,6 +627,13 @@ async def needs_login() -> dict:
 
     from ghinbox.auth import has_valid_auth, DEFAULT_ACCOUNT
 
+    # In test mode, never require login (tests use mocked APIs)
+    if os.environ.get("GHINBOX_TEST_MODE") == "1":
+        logger.warning(
+            "needs_login check: test mode enabled, returning needs_login=False"
+        )
+        return {"needs_login": False, "account": "test"}
+
     account = os.environ.get("GHSIM_ACCOUNT", DEFAULT_ACCOUNT)
     needs_auth = os.environ.get("GHINBOX_NEEDS_AUTH") == "1"
 
