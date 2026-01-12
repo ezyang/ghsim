@@ -108,6 +108,15 @@ test.describe('My PR classification', () => {
       });
     });
 
+    // Mock user endpoint for auth check
+    await page.route('**/github/rest/user', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ login: 'testuser' }),
+      });
+    });
+
     // Mock comments endpoint for syncNotificationBeforeDone
     await page.route('**/github/rest/repos/**/issues/*/comments', (route) => {
       route.fulfill({

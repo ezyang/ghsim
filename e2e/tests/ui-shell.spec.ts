@@ -122,6 +122,8 @@ test.describe('Sync Button', () => {
   });
 
   test('validates repository input on sync', async ({ page }) => {
+    // Clear the repo input first (app defaults to 'pytorch/pytorch' when localStorage is empty)
+    await page.locator('#repo-input').fill('');
     await page.locator('#sync-btn').click();
     await expect(page.locator('#status-bar')).toContainText('Please enter a repository');
 
@@ -147,6 +149,15 @@ test.describe('Auth Status', () => {
         JSON.stringify({ login, timestamp: Date.now() })
       );
     }, 'testuser');
+
+    // Mock user endpoint as fallback if cache lookup fails
+    await page.route('**/github/rest/user', (route) => {
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ login: 'testuser' }),
+      });
+    });
 
     await page.goto('notifications.html');
 

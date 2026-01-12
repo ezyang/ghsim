@@ -397,12 +397,14 @@ test.describe('Own comment filtering', () => {
     await expect(page.locator('#status-bar')).toContainText('Synced');
   });
 
-  test('shows all comments when auth status is not refreshed on load', async ({
+  test('filters comments before own comment when authenticated', async ({
     page,
   }) => {
-    await expect(page.locator('.comment-item')).toHaveCount(3);
-    await expect(page.locator('.comment-item').nth(1)).toContainText(
-      'Looking now.'
+    // filterCommentsAfterOwnComment hides comments before/including the user's own comment.
+    // With testuser authenticated, only comments after 'Looking now.' show.
+    await expect(page.locator('.comment-item')).toHaveCount(1);
+    await expect(page.locator('.comment-item').first()).toContainText(
+      'Thanks for checking in.'
     );
   });
 });
