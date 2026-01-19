@@ -641,11 +641,18 @@ function getCommentStatus(notification) {
     if (isNotificationNeedsReview(notification)) {
         return { label: 'Needs review', className: 'needs-review' };
     }
-    if (count === 0) {
-        return { label: 'Uninteresting (0)', className: 'uninteresting' };
-    }
-    if (isNotificationUninteresting(notification)) {
-        return { label: `Uninteresting (${count})`, className: 'uninteresting' };
+    const reason = getUninterestingReason(notification);
+    const reasonLabels = {
+        'no-comments': 'No new comments',
+        'bot-only': 'Bot comments only',
+        'bot-commands': 'Bot commands only',
+    };
+    if (reason !== null) {
+        const reasonLabel = reasonLabels[reason];
+        return {
+            label: count > 0 ? `${reasonLabel} (${count})` : reasonLabel,
+            className: 'uninteresting'
+        };
     }
     return { label: `Interesting (${count})`, className: 'interesting' };
 }
@@ -812,6 +819,51 @@ function isNotificationUninteresting(notification) {
         return true;
     }
     return comments.every(isUninterestingComment);
+}
+
+function getUninterestingReason(notification) {
+    const cached = state.commentCache.threads[getNotificationKey(notification)];
+    if (!cached || cached.error) {
+        return null;
+    }
+    const anchor = cached.anchor || notification.subject?.anchor || null;
+    const rawComments = cached.comments || [];
+    const comments = cached.allComments ? filterCommentsByAnchor(rawComments, anchor) : rawComments;
+    const filteredComments = filterCommentsAfterOwnComment(comments);
+
+    // Check PR-specific conditions
+    if (notification.subject?.type === 'PullRequest') {
+        if (isNotificationApproved(notification)) {
+            return null; // Approved PRs are interesting
+        }
+        if (filteredComments.length === 0) {
+            return null; // PRs with no comments show "Needs review" - not uninteresting
+        }
+    }
+
+    // No comments case (for issues)
+    if (filteredComments.length === 0) {
+        return 'no-comments';
+    }
+
+    // Check if all comments are from bot authors
+    const allBotAuthors = filteredComments.every(c => isBotAuthor(c?.user?.login || ''));
+    if (allBotAuthors) {
+        return 'bot-only';
+    }
+
+    // Check if all comments are bot interaction commands
+    const allBotCommands = filteredComments.every(c => isBotInteractionComment(c?.body || ''));
+    if (allBotCommands) {
+        return 'bot-commands';
+    }
+
+    // General uninteresting check (mixed bot content)
+    if (filteredComments.every(isUninterestingComment)) {
+        return 'bot-only';
+    }
+
+    return null; // Has interesting content
 }
 
 function isNotificationNeedsReview(notification) {

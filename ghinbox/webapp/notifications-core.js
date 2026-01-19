@@ -10,11 +10,12 @@
 
         // Default view filters for each view
         const DEFAULT_VIEW_FILTERS = {
-            'issues': { state: 'all' }, // 'all' | 'open' | 'closed'
-            'my-prs': { state: 'all' }, // 'all'
+            'issues': { state: 'all', interest: 'all' }, // state: 'all' | 'open' | 'closed', interest: 'all' | 'has-new' | 'no-new'
+            'my-prs': { state: 'all', interest: 'all' }, // 'all'
             'others-prs': {
                 state: 'all', // 'all' | 'needs-review' | 'approved' | 'draft' | 'closed'
                 author: 'all', // 'all' | 'committer' | 'external'
+                interest: 'all', // 'all' | 'has-new' | 'no-new'
             },
         };
         const DEFAULT_VIEW_ORDERS = {
@@ -906,6 +907,23 @@
             });
         }
 
+        function applyInterestFilter(notifications, interestFilter) {
+            if (interestFilter === 'all') {
+                return notifications;
+            }
+            return notifications.filter(notif => {
+                const reason = getUninterestingReason(notif);
+                const isUninteresting = reason !== null;
+                if (interestFilter === 'has-new') {
+                    return !isUninteresting;
+                }
+                if (interestFilter === 'no-new') {
+                    return isUninteresting;
+                }
+                return true;
+            });
+        }
+
         function safeIsNotificationNeedsReview(notification) {
             if (notification.subject?.type !== 'PullRequest') {
                 return false;
@@ -974,6 +992,9 @@
             if (state.view === 'others-prs') {
                 filtered = applyAuthorFilter(filtered, viewFilters.author || 'all');
             }
+
+            // Step 3: Apply interest filter (all views)
+            filtered = applyInterestFilter(filtered, viewFilters.interest || 'all');
 
             if (state.orderBy === 'size' && state.view !== 'issues') {
                 const withIndex = filtered.map((notif, index) => ({
@@ -1086,7 +1107,26 @@
                 });
             }
 
-            return { state: stateCounts, author: authorCounts };
+            // Interest filter counts
+            const interestCounts = { all: 0, hasNew: 0, noNew: 0 };
+
+            // Base for interest: after state and author filters
+            let baseForInterestCounts = applyStateFilter(viewNotifications, stateFilter);
+            if (state.view === 'others-prs') {
+                baseForInterestCounts = applyAuthorFilter(baseForInterestCounts, authorFilter);
+            }
+
+            interestCounts.all = baseForInterestCounts.length;
+            baseForInterestCounts.forEach(notif => {
+                const reason = getUninterestingReason(notif);
+                if (reason !== null) {
+                    interestCounts.noNew++;
+                } else {
+                    interestCounts.hasNew++;
+                }
+            });
+
+            return { state: stateCounts, author: authorCounts, interest: interestCounts };
         }
 
         function updateCommentCacheStatus() {
