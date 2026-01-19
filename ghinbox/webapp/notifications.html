@@ -606,6 +606,16 @@
                     <input type="checkbox" id="comment-hide-uninteresting-toggle">
                     Hide uninteresting comments
                 </label>
+                <div class="comment-age-filter">
+                    <label for="comment-age-filter-select">Comments from:</label>
+                    <select id="comment-age-filter-select" class="comment-age-filter-select">
+                        <option value="all">All time</option>
+                        <option value="1day">Last 1 day</option>
+                        <option value="3days">Last 3 days</option>
+                        <option value="1week">Last 1 week</option>
+                        <option value="1month">Last 1 month</option>
+                    </select>
+                </div>
                 <div class="comment-cache-actions">
                     <span id="comment-cache-status" class="comment-cache-status"></span>
                     <button id="clear-comment-cache-btn" class="btn btn-small" type="button">

@@ -49,6 +49,7 @@
             commentExpandIssues: true,
             commentExpandPrs: true,
             commentHideUninteresting: true,
+            commentAgeFilter: 'all', // 'all' | '1day' | '3days' | '1week' | '1month'
             commentQueue: [],
             commentQueueRunning: false,
             commentCache: { version: 1, threads: {} },
@@ -87,6 +88,7 @@
             commentExpandIssuesToggle: document.getElementById('comment-expand-issues-toggle'),
             commentExpandPrsToggle: document.getElementById('comment-expand-prs-toggle'),
             commentHideUninterestingToggle: document.getElementById('comment-hide-uninteresting-toggle'),
+            commentAgeFilterSelect: document.getElementById('comment-age-filter-select'),
             commentCacheStatus: document.getElementById('comment-cache-status'),
             clearCommentCacheBtn: document.getElementById('clear-comment-cache-btn'),
             rateLimitBox: document.getElementById('rate-limit-box'),
@@ -531,6 +533,12 @@
             }
             elements.commentHideUninterestingToggle.checked = state.commentHideUninteresting;
 
+            const savedCommentAgeFilter = localStorage.getItem(COMMENT_AGE_FILTER_KEY);
+            if (savedCommentAgeFilter && ['all', '1day', '3days', '1week', '1month'].includes(savedCommentAgeFilter)) {
+                state.commentAgeFilter = savedCommentAgeFilter;
+            }
+            elements.commentAgeFilterSelect.value = state.commentAgeFilter;
+
             // Set up event listeners
             elements.syncBtn.addEventListener('click', () => {
                 withActionContext('Quick Sync', () => handleSync({ mode: 'incremental' }));
@@ -587,6 +595,9 @@
             });
             elements.commentHideUninterestingToggle.addEventListener('change', (event) => {
                 setCommentHideUninteresting(event.target.checked);
+            });
+            elements.commentAgeFilterSelect.addEventListener('change', (event) => {
+                setCommentAgeFilter(event.target.value);
             });
             elements.clearCommentCacheBtn.addEventListener('click', () => {
                 withActionContext('Clear comment cache', handleClearCommentCache);
@@ -683,6 +694,12 @@
         function setCommentHideUninteresting(enabled) {
             state.commentHideUninteresting = enabled;
             localStorage.setItem(COMMENT_HIDE_UNINTERESTING_KEY, String(enabled));
+            render();
+        }
+
+        function setCommentAgeFilter(ageFilter) {
+            state.commentAgeFilter = ageFilter;
+            localStorage.setItem(COMMENT_AGE_FILTER_KEY, ageFilter);
             render();
         }
 

@@ -12,6 +12,7 @@ const REVIEW_DECISION_BATCH_SIZE = 40;
 const COMMENT_EXPAND_ISSUES_KEY = 'ghnotif_comment_expand_issues';
 const COMMENT_EXPAND_PRS_KEY = 'ghnotif_comment_expand_prs';
 const COMMENT_HIDE_UNINTERESTING_KEY = 'ghnotif_comment_hide_uninteresting';
+const COMMENT_AGE_FILTER_KEY = 'ghnotif_comment_age_filter';
 
 async function loadCommentCache() {
     try {
@@ -723,6 +724,26 @@ function filterCommentsByAnchor(comments, anchor) {
     return comments.slice(anchorIndex);
 }
 
+function isCommentTooOld(comment, ageFilter) {
+    if (ageFilter === 'all') return false;
+
+    const timestamp = comment.created_at || comment.updated_at;
+    if (!timestamp) return false;
+
+    const commentDate = new Date(timestamp);
+    const now = new Date();
+    const ageMs = now - commentDate;
+
+    const thresholds = {
+        '1day': 1 * 24 * 60 * 60 * 1000,
+        '3days': 3 * 24 * 60 * 60 * 1000,
+        '1week': 7 * 24 * 60 * 60 * 1000,
+        '1month': 30 * 24 * 60 * 60 * 1000,
+    };
+
+    return ageMs > thresholds[ageFilter];
+}
+
 function getCommentItems(notification) {
     const isIssue = notification.subject?.type === 'Issue';
     const isPR = notification.subject?.type === 'PullRequest';
@@ -751,10 +772,17 @@ function getCommentItems(notification) {
     const visibleComments = state.commentHideUninteresting
         ? comments.filter((comment) => !isUninterestingComment(comment))
         : comments;
-    if (visibleComments.length === 0) {
+    // Apply age filter
+    const ageFilteredComments = visibleComments.filter(
+        (comment) => !isCommentTooOld(comment, state.commentAgeFilter)
+    );
+    if (ageFilteredComments.length === 0) {
+        if (visibleComments.length > 0) {
+            return '<li class="comment-item">All comments filtered by age.</li>';
+        }
         return '<li class="comment-item">No interesting unread comments found.</li>';
     }
-    return visibleComments
+    return ageFilteredComments
         .map((comment) => {
             const author = comment.user?.login || 'unknown';
             const timestamp = comment.updated_at || comment.created_at || '';
