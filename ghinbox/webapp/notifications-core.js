@@ -10,11 +10,12 @@
 
         // Default view filters for each view
         const DEFAULT_VIEW_FILTERS = {
-            'issues': { state: 'all' }, // 'all' | 'open' | 'closed'
-            'my-prs': { state: 'all' }, // 'all'
+            'issues': { state: 'all', interest: 'all' }, // state: 'all' | 'open' | 'closed', interest: 'all' | 'has-new' | 'no-new'
+            'my-prs': { state: 'all', interest: 'all' }, // 'all'
             'others-prs': {
                 state: 'all', // 'all' | 'needs-review' | 'approved' | 'draft' | 'closed'
                 author: 'all', // 'all' | 'committer' | 'external'
+                interest: 'all', // 'all' | 'has-new' | 'no-new'
             },
         };
         const DEFAULT_VIEW_ORDERS = {
@@ -48,6 +49,7 @@
             commentExpandIssues: true,
             commentExpandPrs: true,
             commentHideUninteresting: true,
+            commentAgeFilter: 'all', // 'all' | '1day' | '3days' | '1week' | '1month'
             commentQueue: [],
             commentQueueRunning: false,
             commentPrefetchStatusMessage: null,
@@ -91,6 +93,7 @@
             commentExpandIssuesToggle: document.getElementById('comment-expand-issues-toggle'),
             commentExpandPrsToggle: document.getElementById('comment-expand-prs-toggle'),
             commentHideUninterestingToggle: document.getElementById('comment-hide-uninteresting-toggle'),
+            commentAgeFilterSelect: document.getElementById('comment-age-filter-select'),
             commentCacheStatus: document.getElementById('comment-cache-status'),
             clearCommentCacheBtn: document.getElementById('clear-comment-cache-btn'),
             rateLimitBox: document.getElementById('rate-limit-box'),
@@ -535,6 +538,12 @@
             }
             elements.commentHideUninterestingToggle.checked = state.commentHideUninteresting;
 
+            const savedCommentAgeFilter = localStorage.getItem(COMMENT_AGE_FILTER_KEY);
+            if (savedCommentAgeFilter && ['all', '1day', '3days', '1week', '1month'].includes(savedCommentAgeFilter)) {
+                state.commentAgeFilter = savedCommentAgeFilter;
+            }
+            elements.commentAgeFilterSelect.value = state.commentAgeFilter;
+
             // Set up event listeners
             elements.syncBtn.addEventListener('click', () => {
                 withActionContext('Quick Sync', () => handleSync({ mode: 'incremental' }));
@@ -591,6 +600,9 @@
             });
             elements.commentHideUninterestingToggle.addEventListener('change', (event) => {
                 setCommentHideUninteresting(event.target.checked);
+            });
+            elements.commentAgeFilterSelect.addEventListener('change', (event) => {
+                setCommentAgeFilter(event.target.value);
             });
             elements.clearCommentCacheBtn.addEventListener('click', () => {
                 withActionContext('Clear comment cache', handleClearCommentCache);
@@ -687,6 +699,12 @@
         function setCommentHideUninteresting(enabled) {
             state.commentHideUninteresting = enabled;
             localStorage.setItem(COMMENT_HIDE_UNINTERESTING_KEY, String(enabled));
+            render();
+        }
+
+        function setCommentAgeFilter(ageFilter) {
+            state.commentAgeFilter = ageFilter;
+            localStorage.setItem(COMMENT_AGE_FILTER_KEY, ageFilter);
             render();
         }
 
@@ -911,6 +929,23 @@
             });
         }
 
+        function applyInterestFilter(notifications, interestFilter) {
+            if (interestFilter === 'all') {
+                return notifications;
+            }
+            return notifications.filter(notif => {
+                const reason = getUninterestingReason(notif);
+                const isUninteresting = reason !== null;
+                if (interestFilter === 'has-new') {
+                    return !isUninteresting;
+                }
+                if (interestFilter === 'no-new') {
+                    return isUninteresting;
+                }
+                return true;
+            });
+        }
+
         function safeIsNotificationNeedsReview(notification) {
             if (notification.subject?.type !== 'PullRequest') {
                 return false;
@@ -979,6 +1014,9 @@
             if (state.view === 'others-prs') {
                 filtered = applyAuthorFilter(filtered, viewFilters.author || 'all');
             }
+
+            // Step 3: Apply interest filter (all views)
+            filtered = applyInterestFilter(filtered, viewFilters.interest || 'all');
 
             if (state.orderBy === 'size' && state.view !== 'issues') {
                 const withIndex = filtered.map((notif, index) => ({
@@ -1091,7 +1129,26 @@
                 });
             }
 
-            return { state: stateCounts, author: authorCounts };
+            // Interest filter counts
+            const interestCounts = { all: 0, hasNew: 0, noNew: 0 };
+
+            // Base for interest: after state and author filters
+            let baseForInterestCounts = applyStateFilter(viewNotifications, stateFilter);
+            if (state.view === 'others-prs') {
+                baseForInterestCounts = applyAuthorFilter(baseForInterestCounts, authorFilter);
+            }
+
+            interestCounts.all = baseForInterestCounts.length;
+            baseForInterestCounts.forEach(notif => {
+                const reason = getUninterestingReason(notif);
+                if (reason !== null) {
+                    interestCounts.noNew++;
+                } else {
+                    interestCounts.hasNew++;
+                }
+            });
+
+            return { state: stateCounts, author: authorCounts, interest: interestCounts };
         }
 
         function updateCommentCacheStatus() {
